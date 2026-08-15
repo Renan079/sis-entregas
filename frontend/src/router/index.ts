@@ -9,6 +9,7 @@ import ClientesView from '@/pages/Clientes/ClientesView.vue'
 import RegioesView from '@/pages/Regioes/RegioesView.vue'
 import EntregasView from '@/pages/Entregas/EntregasView.vue'
 import SaidasView from '@/pages/Saidas/SaidasView.vue'
+import PendenciasView from '@/pages/Pendencias/PendenciasView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -42,20 +43,29 @@ const router = createRouter({
           name: 'clientes',
           component: ClientesView,
         },
+
         {
           path: 'regioes',
           name: 'regioes',
           component: RegioesView,
         },
+
         {
           path: 'entregas',
           name: 'entregas',
           component: EntregasView,
         },
+
         {
           path: 'saidas',
           name: 'saidas',
           component: SaidasView,
+        },
+
+        {
+          path: 'pendencias',
+          name: 'pendencias',
+          component: PendenciasView,
         },
       ],
     },

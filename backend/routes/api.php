@@ -9,6 +9,8 @@ use App\Http\Controllers\SaidaController;
 use App\Http\Controllers\VeiculoController;
 use App\Http\Controllers\EntregaHistoricoController;
 use App\Http\Controllers\SaidaHistoricoController;
+use App\Http\Controllers\PendenciaController;
+use App\Http\Controllers\ClienteHistoricoController;
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -30,6 +32,20 @@ Route::middleware('auth:sanctum')->group(function () {
         ->parameters([
             'entregas' => 'entrega',
         ]);
+
+
+    Route::get('/pendencias', [
+        PendenciaController::class,
+        'index',
+    ]);
+
+    Route::post(
+        '/pendencias/{pendencia}/resolver-manualmente',
+        [
+            PendenciaController::class,
+            'resolverManualmente',
+        ]
+    );
 
     Route::get('/saidas', [
         SaidaController::class,
@@ -138,6 +154,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         '/saidas/{saida}/historico',
         SaidaHistoricoController::class
+    );
+
+    Route::get(
+        '/clientes/{cliente}/entregas',
+        ClienteHistoricoController::class
     );
 
 });

@@ -3172,3 +3172,313 @@ it('mantem saldo normal correto depois de reentrega parcial com devolucao', func
     );
 });
 
+it('resolve manualmente uma pendencia aberta por desistência do cliente', function () {
+    $entrega = criarEntregaParaSaida(
+        $this->usuario,
+        $this->regiao,
+        'MANUAL-001'
+    );
+
+    $item = $entrega->itens()->first();
+
+    /*
+     * Pedido total: 5 unidades.
+     */
+    $item->update([
+        'quantidade_solicitada' => 5,
+    ]);
+
+    /*
+     * Primeira carrada leva as 5.
+     */
+    $saida = Saida::create([
+        'data_saida' => '2026-08-14',
+        'regiao_principal_id' => $this->regiao->id,
+        'veiculo_id' => $this->veiculo->id,
+        'status' => 'PLANEJADA',
+        'criado_por' => $this->usuario->id,
+    ]);
+
+    $this->postJson(
+        "/api/saidas/{$saida->id}/entregas",
+        [
+            'entrega_id' => $entrega->id,
+
+            'itens' => [
+                [
+                    'entrega_item_id' => $item->id,
+                    'quantidade_programada' => 5,
+                ],
+            ],
+        ]
+    )->assertOk();
+
+    $this->postJson(
+        "/api/saidas/{$saida->id}/iniciar"
+    )->assertOk();
+
+    /*
+     * Nenhuma unidade foi entregue.
+     *
+     * As 5 ficam para reentrega.
+     */
+    $this->postJson(
+        "/api/saidas/{$saida->id}/entregas/{$entrega->id}/resultado",
+        [
+            'itens' => [
+                [
+                    'entrega_item_id' => $item->id,
+                    'quantidade_entregue' => 0,
+                    'destino_nao_entregue' => 'REENTREGA',
+                ],
+            ],
+
+            'motivo_nao_entrega' =>
+                'Cliente não recebeu o produto.',
+        ]
+    )->assertCreated();
+
+    $pendencia = \App\Models\Pendencia::query()
+        ->where('entrega_id', $entrega->id)
+        ->where('entrega_item_id', $item->id)
+        ->firstOrFail();
+
+    /*
+     * Antes da resolução manual:
+     *
+     * original = 5
+     * resolvido = 0
+     * saldo = 5
+     * status = ABERTA
+     */
+    $this->assertDatabaseHas(
+        'pendencias',
+        [
+            'id' => $pendencia->id,
+            'quantidade_original' => '5.000',
+            'quantidade_resolvida' => '0.000',
+            'status' => 'ABERTA',
+        ]
+    );
+
+    /*
+     * Dois dias depois o cliente comparece à loja
+     * e informa que não deseja mais as 5 unidades.
+     */
+    $response = $this->postJson(
+        "/api/pendencias/{$pendencia->id}/resolver-manualmente",
+        [
+            'motivo_devolucao' => 'CLIENTE_DESISTIU',
+            'observacao' =>
+                'Cliente compareceu à loja e desistiu do restante.',
+        ]
+    );
+
+    $response
+        ->assertOk()
+        ->assertJsonPath(
+            'data.status',
+            'RESOLVIDA'
+        )
+        ->assertJsonPath(
+            'data.quantidade_original',
+            5
+        )
+        ->assertJsonPath(
+            'data.quantidade_resolvida',
+            5
+        )
+        ->assertJsonPath(
+            'data.saldo_pendente',
+            0
+        );
+
+    /*
+     * A pendência precisa estar encerrada.
+     */
+    $this->assertDatabaseHas(
+        'pendencias',
+        [
+            'id' => $pendencia->id,
+            'quantidade_original' => '5.000',
+            'quantidade_resolvida' => '5.000',
+            'status' => 'RESOLVIDA',
+        ]
+    );
+
+    /*
+     * A quantidade deixa de ser obrigação logística
+     * e vira devolução.
+     *
+     * Não existe carrada nesta operação.
+     */
+    $this->assertDatabaseHas(
+        'devolucoes',
+        [
+            'entrega_id' => $entrega->id,
+            'entrega_item_id' => $item->id,
+            'pendencia_id' => $pendencia->id,
+            'quantidade' => '5.000',
+            'motivo' => 'CLIENTE_DESISTIU',
+            'registrado_por' => $this->usuario->id,
+        ]
+    );
+
+    /*
+     * Precisamos preservar no histórico que essa
+     * resolução aconteceu manualmente.
+     */
+    $this->assertDatabaseHas(
+        'pendencia_movimentacoes',
+        [
+            'pendencia_id' => $pendencia->id,
+            'tipo' => 'AJUSTE',
+            'quantidade' => '5.000',
+            'usuario_id' => $this->usuario->id,
+        ]
+    );
+
+    /*
+     * 0 entregue + 5 devolvido = 5 tratados.
+     *
+     * Não existe mais nada para entregar.
+     */
+    $this->assertDatabaseHas(
+        'entregas',
+        [
+            'id' => $entrega->id,
+            'status' => 'CONCLUIDA',
+        ]
+    );
+});
+
+it('nao resolve manualmente uma pendencia que esta programada em carrada', function () {
+    $entrega = criarEntregaParaSaida(
+        $this->usuario,
+        $this->regiao,
+        'MANUAL-002'
+    );
+
+    $item = $entrega->itens()->first();
+
+    $item->update([
+        'quantidade_solicitada' => 5,
+    ]);
+
+    /*
+     * Carrada inicial que gera a pendência.
+     */
+    $saidaOrigem = Saida::create([
+        'data_saida' => '2026-08-14',
+        'regiao_principal_id' => $this->regiao->id,
+        'veiculo_id' => $this->veiculo->id,
+        'status' => 'PLANEJADA',
+        'criado_por' => $this->usuario->id,
+    ]);
+
+    $this->postJson(
+        "/api/saidas/{$saidaOrigem->id}/entregas",
+        [
+            'entrega_id' => $entrega->id,
+
+            'itens' => [
+                [
+                    'entrega_item_id' => $item->id,
+                    'quantidade_programada' => 5,
+                ],
+            ],
+        ]
+    )->assertOk();
+
+    $this->postJson(
+        "/api/saidas/{$saidaOrigem->id}/iniciar"
+    )->assertOk();
+
+    $this->postJson(
+        "/api/saidas/{$saidaOrigem->id}/entregas/{$entrega->id}/resultado",
+        [
+            'itens' => [
+                [
+                    'entrega_item_id' => $item->id,
+                    'quantidade_entregue' => 0,
+                    'destino_nao_entregue' => 'REENTREGA',
+                ],
+            ],
+        ]
+    )->assertCreated();
+
+    $pendencia = \App\Models\Pendencia::query()
+        ->where('entrega_id', $entrega->id)
+        ->firstOrFail();
+
+    /*
+     * Agora coloca a pendência em uma nova carrada.
+     */
+    $saidaReentrega = Saida::create([
+        'data_saida' => '2026-08-16',
+        'regiao_principal_id' => $this->regiao->id,
+        'veiculo_id' => $this->veiculo->id,
+        'status' => 'PLANEJADA',
+        'criado_por' => $this->usuario->id,
+    ]);
+
+    $this->postJson(
+        "/api/saidas/{$saidaReentrega->id}/pendencias/{$pendencia->id}"
+    )->assertNoContent();
+
+    /*
+     * Agora está PROGRAMADA.
+     */
+    $this->assertDatabaseHas(
+        'pendencias',
+        [
+            'id' => $pendencia->id,
+            'quantidade_resolvida' => '0.000',
+            'status' => 'PROGRAMADA',
+        ]
+    );
+
+    /*
+     * Tenta resolver manualmente.
+     *
+     * Deve ser bloqueado.
+     */
+    $response = $this->postJson(
+        "/api/pendencias/{$pendencia->id}/resolver-manualmente",
+        [
+            'motivo_devolucao' => 'CLIENTE_DESISTIU',
+            'observacao' =>
+                'Cliente desistiu do restante.',
+        ]
+    );
+
+    $response
+        ->assertStatus(422)
+        ->assertJsonValidationErrors([
+            'pendencia',
+        ]);
+
+    /*
+     * A pendência permanece intacta.
+     */
+    $this->assertDatabaseHas(
+        'pendencias',
+        [
+            'id' => $pendencia->id,
+            'quantidade_original' => '5.000',
+            'quantidade_resolvida' => '0.000',
+            'status' => 'PROGRAMADA',
+        ]
+    );
+
+    /*
+     * Nenhuma devolução manual pode ter sido criada.
+     */
+    $this->assertDatabaseMissing(
+        'devolucoes',
+        [
+            'pendencia_id' => $pendencia->id,
+            'motivo' => 'CLIENTE_DESISTIU',
+        ]
+    );
+});

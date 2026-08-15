@@ -654,6 +654,215 @@ class PendenciaService
     }
 
     /**
+     * Resolve manualmente uma pendência ABERTA.
+     *
+     * Use quando a obrigação deixou de existir sem
+     * uma nova carrada, por exemplo quando o cliente
+     * comparece à loja e desiste do saldo pendente.
+     *
+     * A quantidade restante é registrada como
+     * devolução e a pendência é encerrada.
+     */
+    public function resolverManualmente(
+        Pendencia $pendencia,
+        array $dados,
+        User $usuario
+    ): Pendencia {
+        return DB::transaction(function () use (
+            $pendencia,
+            $dados,
+            $usuario
+        ) {
+            $pendencia = Pendencia::query()
+                ->whereKey($pendencia->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (
+                $pendencia->status !==
+                StatusPendencia::ABERTA
+            ) {
+                $mensagem = match (
+                    $pendencia->status
+                ) {
+                    StatusPendencia::PROGRAMADA =>
+                        'Esta pendência está programada em uma carrada. Remova-a da carrada antes de resolver manualmente.',
+
+                    StatusPendencia::RESOLVIDA =>
+                        'Esta pendência já está resolvida.',
+
+                    StatusPendencia::CANCELADA =>
+                        'Esta pendência está cancelada.',
+
+                    default =>
+                        'Esta pendência não pode ser resolvida manualmente no estado atual.',
+                };
+
+                throw ValidationException::withMessages([
+                    'pendencia' => [
+                        $mensagem,
+                    ],
+                ]);
+            }
+
+            $saldoPendente = max(
+                0,
+                round(
+                    (float)
+                    $pendencia->quantidade_original
+                    -
+                    (float)
+                    $pendencia->quantidade_resolvida,
+                    3
+                )
+            );
+
+            if ($saldoPendente <= 0) {
+                throw ValidationException::withMessages([
+                    'pendencia' => [
+                        'Esta pendência não possui saldo para resolver.',
+                    ],
+                ]);
+            }
+
+            $motivoDevolucao = trim(
+                (string) (
+                    $dados['motivo_devolucao']
+                    ?? ''
+                )
+            );
+
+            $observacao = isset(
+                $dados['observacao']
+            )
+                ? trim(
+                    (string)
+                    $dados['observacao']
+                )
+                : null;
+
+            Devolucao::create([
+                'entrega_id' =>
+                    $pendencia->entrega_id,
+
+                'entrega_item_id' =>
+                    $pendencia->entrega_item_id,
+
+                /*
+                 * Não houve uma carrada nesta resolução.
+                 */
+                'saida_id' =>
+                    null,
+
+                'tentativa_origem_id' =>
+                    null,
+
+                'pendencia_id' =>
+                    $pendencia->id,
+
+                'quantidade' =>
+                    $saldoPendente,
+
+                'motivo' =>
+                    $motivoDevolucao,
+
+                'observacao' =>
+                    $observacao ?: null,
+
+                'registrado_por' =>
+                    $usuario->id,
+
+                'data_hora' =>
+                    now(),
+            ]);
+
+            PendenciaMovimentacao::create([
+                'pendencia_id' =>
+                    $pendencia->id,
+
+                'tentativa_id' =>
+                    null,
+
+                /*
+                 * O enum atual não possui um tipo exclusivo
+                 * para resolução manual/devolução.
+                 */
+                'tipo' =>
+                    'AJUSTE',
+
+                'quantidade' =>
+                    $saldoPendente,
+
+                'observacao' =>
+                    $observacao
+                        ? "Resolução manual ({$motivoDevolucao}): {$observacao}"
+                        : "Resolução manual ({$motivoDevolucao}).",
+
+                'usuario_id' =>
+                    $usuario->id,
+            ]);
+
+            $pendencia->update([
+                'quantidade_resolvida' =>
+                    $pendencia->quantidade_original,
+
+                'status' =>
+                    StatusPendencia::RESOLVIDA,
+
+                'data_resolucao' =>
+                    now(),
+            ]);
+
+            $entrega = $pendencia
+                ->entrega()
+                ->first();
+
+            if ($entrega) {
+                $this->entregaStatusService
+                    ->sincronizar(
+                        $entrega
+                    );
+
+                EntregaEvento::create([
+                    'entrega_id' =>
+                        $entrega->id,
+
+                    'usuario_id' =>
+                        $usuario->id,
+
+                    'tipo_evento' =>
+                        'PENDENCIA_RESOLVIDA_MANUALMENTE',
+
+                    'descricao' =>
+                        'Pendência resolvida manualmente por devolução/desistência.',
+
+                    'dados' => [
+                        'pendencia_id' =>
+                            $pendencia->id,
+
+                        'entrega_item_id' =>
+                            $pendencia->entrega_item_id,
+
+                        'quantidade' =>
+                            $saldoPendente,
+
+                        'motivo_devolucao' =>
+                            $motivoDevolucao,
+
+                        'observacao' =>
+                            $observacao ?: null,
+
+                        'resolucao_manual' =>
+                            true,
+                    ],
+                ]);
+            }
+
+            return $pendencia->refresh();
+        });
+    }
+
+    /**
      * Cria uma nova pendência causada por uma
      * tentativa de entrega normal.
      */
