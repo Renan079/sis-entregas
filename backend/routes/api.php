@@ -11,6 +11,7 @@ use App\Http\Controllers\EntregaHistoricoController;
 use App\Http\Controllers\SaidaHistoricoController;
 use App\Http\Controllers\PendenciaController;
 use App\Http\Controllers\ClienteHistoricoController;
+use App\Http\Controllers\DashboardController;
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -159,6 +160,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         '/clientes/{cliente}/entregas',
         ClienteHistoricoController::class
+    );
+
+    Route::get(
+        '/dashboard',
+        DashboardController::class
     );
 
 });
