@@ -5,6 +5,7 @@ import { entregaService } from '@/services/entregaService'
 import type { EntregaHistorico } from '@/services/entregaService'
 import { clienteService } from '@/services/clienteService'
 import { regiaoService } from '@/services/regiaoService'
+import ImportarEntregaModal from '@/components/Entregas/ImportarEntregaModal.vue'
 
 import type { Cliente } from '@/types/Cliente'
 import type { Regiao } from '@/types/Regiao'
@@ -26,6 +27,7 @@ const salvando = ref(false)
 const erro = ref('')
 
 const modalAberto = ref(false)
+const modalImportacao = ref(false)
 const entregaEditandoId = ref<number | null>(null)
 
 const modalHistorico = ref(false)
@@ -163,6 +165,19 @@ function limparClienteSelecionado() {
 
   buscaCliente.value = ''
   clientes.value = []
+}
+
+function abrirImportacao() {
+  modalImportacao.value = true
+}
+
+function fecharImportacao() {
+  modalImportacao.value = false
+}
+
+async function importacaoConcluida() {
+  modalImportacao.value = false
+  await carregarEntregas(1)
 }
 
 function novaEntrega() {
@@ -492,13 +507,23 @@ onMounted(async () => {
         </p>
       </div>
 
-      <button
-        class="botao primario"
-        type="button"
-        @click="novaEntrega"
-      >
-        + Nova entrega
-      </button>
+      <div class="cabecalho-acoes">
+        <button
+          class="botao secundario"
+          type="button"
+          @click="abrirImportacao"
+        >
+          Importar foto
+        </button>
+
+        <button
+          class="botao primario"
+          type="button"
+          @click="novaEntrega"
+        >
+          + Nova entrega
+        </button>
+      </div>
     </header>
 
     <section class="card filtros">
@@ -1410,6 +1435,13 @@ onMounted(async () => {
         </form>
       </section>
     </div>
+    <ImportarEntregaModal
+      :aberto="modalImportacao"
+      :regioes="regioes"
+      @fechar="fecharImportacao"
+      @importado="importacaoConcluida"
+    />
+
   </main>
 </template>
 
@@ -2166,4 +2198,22 @@ td {
     margin-top: 10px;
   }
 }
+
+.cabecalho-acoes {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 700px) {
+  .cabecalho-acoes {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .cabecalho-acoes .botao {
+    width: 100%;
+  }
+}
+
 </style>

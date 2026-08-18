@@ -12,6 +12,7 @@ use App\Http\Controllers\SaidaHistoricoController;
 use App\Http\Controllers\PendenciaController;
 use App\Http\Controllers\ClienteHistoricoController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentoImportacaoController;
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -165,6 +166,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get(
         '/dashboard',
         DashboardController::class
+    );
+
+    Route::post(
+        '/documentos/importar-preview',
+        [DocumentoImportacaoController::class, 'preview']
+    );
+
+    Route::post(
+        '/documentos/{documentoId}/confirmar',
+        [DocumentoImportacaoController::class, 'confirmar']
     );
 
 });
