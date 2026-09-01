@@ -19,72 +19,190 @@ class DocumentoImportacaoService
     }
 
     public function gerarPreview(
-        UploadedFile $arquivo,
+        array $arquivos,
         int $usuarioId
     ): array {
-        $tabela = $this->tabelaDocumentos();
-        $hash = hash_file(
-            'sha256',
-            $arquivo->getRealPath()
-        );
-
-        $existente = DB::table($tabela)
-            ->where('hash_sha256', $hash)
-            ->first();
-
-        if ($existente) {
+        if ($arquivos === []) {
             throw ValidationException::withMessages([
-                'arquivo' => [
-                    'Esta mesma imagem já foi enviada anteriormente.',
+                'arquivos' => [
+                    'Selecione pelo menos uma foto ou um PDF.',
                 ],
             ]);
         }
 
-        $nome = sprintf(
-            '%s.%s',
-            Str::uuid(),
-            strtolower(
-                $arquivo->getClientOriginalExtension()
-            )
-        );
+        $tabela = $this->tabelaDocumentos();
 
-        $diretorio = sprintf(
-            'documentos-importados/%s/%s',
-            now()->format('Y'),
-            now()->format('m')
-        );
+        $metadadosArquivos = [];
+        $hashes = [];
 
-        $path = $arquivo->storeAs(
-            $diretorio,
-            $nome,
-            'local'
-        );
+        foreach (
+            array_values($arquivos)
+            as $indice => $arquivo
+        ) {
+            if (! $arquivo instanceof UploadedFile) {
+                continue;
+            }
 
-        $agora = now();
-
-        $documentoId = DB::table($tabela)
-            ->insertGetId([
-                'usuario_id' => $usuarioId,
-                /*
-                 * A tabela atual usa enum/check com valores de domínio
-                 * (FOTO, PDF, CSV, XLS, XLSX, XML), não MIME type.
-                 */
-                'tipo_arquivo' => 'FOTO',
-                'nome_arquivo' =>
-                    $arquivo->getClientOriginalName(),
-                'arquivo_path' => $path,
-                'hash_sha256' => $hash,
-                'status' => 'PROCESSANDO',
-                'created_at' => $agora,
-                'updated_at' => $agora,
-            ]);
-
-        try {
-            $texto = $this->ocr->extrairTexto(
-                Storage::disk('local')->path($path)
+            $hash = hash_file(
+                'sha256',
+                $arquivo->getRealPath()
             );
 
-            $dados = $this->parser->interpretar($texto);
+            $hashes[] = $hash;
+
+            $metadadosArquivos[] = [
+                'ordem' => $indice + 1,
+                'nome_original' =>
+                    $arquivo->getClientOriginalName(),
+                'extensao' => strtolower(
+                    $arquivo->getClientOriginalExtension()
+                ),
+                'hash_sha256' => $hash,
+            ];
+        }
+
+        if ($metadadosArquivos === []) {
+            throw ValidationException::withMessages([
+                'arquivos' => [
+                    'Nenhum arquivo válido foi recebido.',
+                ],
+            ]);
+        }
+
+        /*
+         * Para várias fotos, a ordem faz parte do documento.
+         * Assim, o conjunto inteiro possui um único hash.
+         */
+        $hashDocumento = hash(
+            'sha256',
+            implode('|', $hashes)
+        );
+
+        $existente = DB::table($tabela)
+            ->where('hash_sha256', $hashDocumento)
+            ->first();
+
+        if ($existente) {
+            throw ValidationException::withMessages([
+                'arquivos' => [
+                    'Este mesmo documento já foi enviado anteriormente.',
+                ],
+            ]);
+        }
+
+        $somenteUmPdf =
+            count($metadadosArquivos) === 1 &&
+            $metadadosArquivos[0]['extensao'] === 'pdf';
+
+        $tipoArquivo =
+            $somenteUmPdf
+                ? 'PDF'
+                : 'FOTO';
+
+        $diretorio = sprintf(
+            'documentos-importados/%s/%s/%s',
+            now()->format('Y'),
+            now()->format('m'),
+            Str::uuid()
+        );
+
+        $pathsSalvos = [];
+
+        try {
+            foreach (
+                array_values($arquivos)
+                as $indice => $arquivo
+            ) {
+                $extensao = strtolower(
+                    $arquivo->getClientOriginalExtension()
+                );
+
+                $nome = sprintf(
+                    '%02d-%s.%s',
+                    $indice + 1,
+                    Str::uuid(),
+                    $extensao
+                );
+
+                $path = $arquivo->storeAs(
+                    $diretorio,
+                    $nome,
+                    'local'
+                );
+
+                $pathsSalvos[] = $path;
+                $metadadosArquivos[$indice]['path'] = $path;
+            }
+
+            $nomeDocumento =
+                count($metadadosArquivos) === 1
+                    ? $metadadosArquivos[0]['nome_original']
+                    : sprintf(
+                        'Nota com %d fotos',
+                        count($metadadosArquivos)
+                    );
+
+            $agora = now();
+
+            $documentoId = DB::table($tabela)
+                ->insertGetId([
+                    'usuario_id' => $usuarioId,
+                    'tipo_arquivo' => $tipoArquivo,
+                    'nome_arquivo' => $nomeDocumento,
+                    /*
+                     * Mantemos compatibilidade com a tabela atual.
+                     * Em múltiplas fotos, arquivo_path aponta para a
+                     * primeira página; todos os paths ficam também
+                     * gravados no JSON de origem.
+                     */
+                    'arquivo_path' => $pathsSalvos[0],
+                    'hash_sha256' => $hashDocumento,
+                    'status' => 'PROCESSANDO',
+                    'dados_extraidos' => json_encode(
+                        [
+                            'origem' => [
+                                'tipo' => $tipoArquivo,
+                                'quantidade_arquivos' =>
+                                    count($metadadosArquivos),
+                                'arquivos' =>
+                                    $metadadosArquivos,
+                            ],
+                        ],
+                        JSON_UNESCAPED_UNICODE
+                    ),
+                    'created_at' => $agora,
+                    'updated_at' => $agora,
+                ]);
+        } catch (Throwable $e) {
+            foreach ($pathsSalvos as $path) {
+                Storage::disk('local')->delete($path);
+            }
+
+            throw $e;
+        }
+
+        try {
+            $caminhosAbsolutos = collect(
+                $pathsSalvos
+            )
+                ->map(
+                    fn (string $path) =>
+                        Storage::disk('local')->path($path)
+                )
+                ->all();
+
+            $ocr = $this->ocr
+                ->extrairTextoDeArquivos(
+                    $caminhosAbsolutos
+                );
+
+            $texto = $ocr['texto'];
+            $dados = $this->parser
+                ->interpretar($texto);
+
+            $this->adicionarAvisoSobrePossivelSobreposicao(
+                $dados
+            );
 
             $sugestoes = [
                 'cliente' =>
@@ -120,6 +238,15 @@ class DocumentoImportacaoService
                     'texto_extraido' => $texto,
                     'dados_extraidos' => json_encode(
                         [
+                            'origem' => [
+                                'tipo' => $tipoArquivo,
+                                'quantidade_arquivos' =>
+                                    count($metadadosArquivos),
+                                'arquivos' =>
+                                    $metadadosArquivos,
+                                'paginas_ocr' =>
+                                    $ocr['paginas'],
+                            ],
                             'dados' => $dados,
                             'sugestoes' => $sugestoes,
                         ],
@@ -132,8 +259,10 @@ class DocumentoImportacaoService
             return [
                 'documento' => [
                     'id' => $documentoId,
-                    'nome_arquivo' =>
-                        $arquivo->getClientOriginalName(),
+                    'nome_arquivo' => $nomeDocumento,
+                    'tipo_arquivo' => $tipoArquivo,
+                    'quantidade_arquivos' =>
+                        count($metadadosArquivos),
                     'status' => 'AGUARDANDO_CONFIRMACAO',
                 ],
                 'dados' => $dados,
@@ -150,8 +279,8 @@ class DocumentoImportacaoService
                 ]);
 
             throw ValidationException::withMessages([
-                'arquivo' => [
-                    'Não foi possível ler esta foto. Tente uma imagem mais reta, iluminada e nítida. Detalhe: '
+                'arquivos' => [
+                    'Não foi possível ler este documento. Confira as fotos/PDF e tente novamente. Detalhe: '
                     . $e->getMessage(),
                 ],
             ]);
@@ -184,7 +313,7 @@ class DocumentoImportacaoService
                 ]);
             }
 
-            if ($documento->status === 'IMPORTADO') {
+            if ($documento->status === 'CONFIRMADO') {
                 throw ValidationException::withMessages([
                     'documento' => [
                         'Este documento já foi importado.',
@@ -265,12 +394,19 @@ class DocumentoImportacaoService
                 ]);
             }
 
+            $dadosAnteriores = json_decode(
+                (string) ($documento->dados_extraidos ?? '{}'),
+                true
+            );
+
             DB::table($tabela)
                 ->where('id', $documentoId)
                 ->update([
                     'status' => 'CONFIRMADO',
                     'dados_extraidos' => json_encode(
                         [
+                            'origem' =>
+                                $dadosAnteriores['origem'] ?? null,
                             'entrega_id' => $entregaId,
                             'dados_confirmados' => $dados,
                         ],
@@ -429,6 +565,45 @@ class DocumentoImportacaoService
             'nome' => $melhor->nome,
             'cidade' => $melhor->cidade,
         ];
+    }
+
+    private function adicionarAvisoSobrePossivelSobreposicao(
+        array &$dados
+    ): void {
+        $assinaturas = [];
+        $duplicados = false;
+
+        foreach (
+            $dados['itens'] ?? []
+            as $item
+        ) {
+            $assinatura = implode('|', [
+                $this->normalizar(
+                    (string) ($item['codigo_produto'] ?? '')
+                ),
+                $this->normalizar(
+                    (string) ($item['descricao_produto'] ?? '')
+                ),
+                number_format(
+                    (float) ($item['quantidade_solicitada'] ?? 0),
+                    3,
+                    '.',
+                    ''
+                ),
+            ]);
+
+            if (isset($assinaturas[$assinatura])) {
+                $duplicados = true;
+                break;
+            }
+
+            $assinaturas[$assinatura] = true;
+        }
+
+        if ($duplicados) {
+            $dados['avisos'][] =
+                'Foram encontrados produtos idênticos mais de uma vez. Se as fotos tiveram sobreposição, confira se algum item foi lido duplicado.';
+        }
     }
 
     private function normalizar(string $texto): string

@@ -17,10 +17,24 @@ class DocumentoImportacaoController extends Controller
     public function preview(
         ImportarDocumentoPreviewRequest $request
     ): JsonResponse {
-        $resultado = $this->service->gerarPreview(
-            $request->file('arquivo'),
-            $request->user()->id
-        );
+        $arquivos =
+            $request->file('arquivos');
+
+        if (! is_array($arquivos)) {
+            $arquivoLegado =
+                $request->file('arquivo');
+
+            $arquivos =
+                $arquivoLegado
+                    ? [$arquivoLegado]
+                    : [];
+        }
+
+        $resultado =
+            $this->service->gerarPreview(
+                $arquivos,
+                $request->user()->id
+            );
 
         return response()->json([
             'data' => $resultado,
@@ -31,11 +45,12 @@ class DocumentoImportacaoController extends Controller
         ConfirmarImportacaoDocumentoRequest $request,
         int $documentoId
     ): JsonResponse {
-        $resultado = $this->service->confirmar(
-            $documentoId,
-            $request->validated(),
-            $request->user()->id
-        );
+        $resultado =
+            $this->service->confirmar(
+                $documentoId,
+                $request->validated(),
+                $request->user()->id
+            );
 
         return response()->json([
             'data' => $resultado,

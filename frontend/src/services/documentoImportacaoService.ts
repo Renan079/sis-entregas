@@ -4,7 +4,7 @@ import type {
   ConfirmarImportacaoPayload,
   DocumentoImportacaoPreview,
   ImportacaoConfirmada,
-} from '@/types/DocumentoImportacao.ts'
+} from '@/types/DocumentoImportacao'
 
 interface PreviewResponse {
   data: DocumentoImportacaoPreview
@@ -16,10 +16,13 @@ interface ConfirmarResponse {
 
 export const documentoImportacaoService = {
   async gerarPreview(
-    arquivo: File,
+    arquivos: File[],
   ): Promise<DocumentoImportacaoPreview> {
     const formData = new FormData()
-    formData.append('arquivo', arquivo)
+
+    arquivos.forEach((arquivo) => {
+      formData.append('arquivos[]', arquivo)
+    })
 
     const response =
       await api.post<PreviewResponse>(

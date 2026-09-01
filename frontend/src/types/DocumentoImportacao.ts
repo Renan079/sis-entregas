@@ -17,6 +17,8 @@ export interface DocumentoImportacaoPreview {
   documento: {
     id: number
     nome_arquivo: string
+    tipo_arquivo: 'FOTO' | 'PDF'
+    quantidade_arquivos: number
     status: 'AGUARDANDO_CONFIRMACAO'
   }
 

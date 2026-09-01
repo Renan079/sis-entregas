@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-import { documentoImportacaoService } from '@/services/documentoImportacaoService.ts'
+import { documentoImportacaoService } from '@/services/documentoImportacaoService'
 
 import type { Regiao } from '@/types/Regiao'
 import type {
   ConfirmarImportacaoPayload,
   DocumentoImportacaoPreview,
-} from '@/types/DocumentoImportacao.ts'
+} from '@/types/DocumentoImportacao'
+
+interface ArquivoSelecionado {
+  id: string
+  arquivo: File
+  url: string | null
+}
 
 const props = defineProps<{
   aberto: boolean
@@ -20,15 +26,27 @@ const emit = defineEmits<{
 }>()
 
 const inputCamera = ref<HTMLInputElement | null>(null)
-const inputArquivo = ref<HTMLInputElement | null>(null)
+const inputFotos = ref<HTMLInputElement | null>(null)
+const inputPdf = ref<HTMLInputElement | null>(null)
 
+const arquivos = ref<ArquivoSelecionado[]>([])
 const preview = ref<DocumentoImportacaoPreview | null>(null)
-const imagemUrl = ref<string | null>(null)
 const processando = ref(false)
 const salvando = ref(false)
 const erro = ref('')
 
 const formulario = ref<ConfirmarImportacaoPayload | null>(null)
+
+const temPdf = computed(() =>
+  arquivos.value.some(
+    (item) => item.arquivo.type === 'application/pdf',
+  ),
+)
+
+const podeProcessar = computed(() =>
+  arquivos.value.length > 0 &&
+  !processando.value,
+)
 
 const podeConfirmar = computed(() => {
   const dados = formulario.value
@@ -64,89 +82,122 @@ function abrirCamera() {
   inputCamera.value?.click()
 }
 
-function selecionarArquivo() {
-  inputArquivo.value?.click()
+function selecionarFotos() {
+  inputFotos.value?.click()
 }
 
-async function arquivoSelecionado(
-  event: Event,
-) {
+function selecionarPdf() {
+  inputPdf.value?.click()
+}
+
+function cameraSelecionada(event: Event) {
   const input = event.target as HTMLInputElement
   const arquivo = input.files?.[0]
-
   input.value = ''
 
-  if (!arquivo) {
-    return
+  if (!arquivo) return
+
+  if (temPdf.value) {
+    limparArquivos()
   }
 
+  adicionarArquivos([arquivo])
+}
+
+function fotosSelecionadas(event: Event) {
+  const input = event.target as HTMLInputElement
+  const novos = Array.from(input.files ?? [])
+  input.value = ''
+
+  if (!novos.length) return
+
+  if (temPdf.value) {
+    limparArquivos()
+  }
+
+  adicionarArquivos(novos)
+}
+
+function pdfSelecionado(event: Event) {
+  const input = event.target as HTMLInputElement
+  const arquivo = input.files?.[0]
+  input.value = ''
+
+  if (!arquivo) return
+
+  limparArquivos()
+  adicionarArquivos([arquivo])
+}
+
+function adicionarArquivos(novos: File[]) {
   erro.value = ''
   preview.value = null
   formulario.value = null
 
-  if (imagemUrl.value) {
-    URL.revokeObjectURL(imagemUrl.value)
+  const vagas = Math.max(0, 12 - arquivos.value.length)
+
+  if (novos.length > vagas) {
+    erro.value = 'Uma nota pode ter no máximo 12 fotos.'
   }
 
-  imagemUrl.value = URL.createObjectURL(arquivo)
+  novos.slice(0, vagas).forEach((arquivo) => {
+    arquivos.value.push({
+      id: `${Date.now()}-${Math.random()}`,
+      arquivo,
+      url: arquivo.type.startsWith('image/')
+        ? URL.createObjectURL(arquivo)
+        : null,
+    })
+  })
+}
+
+function removerArquivo(index: number) {
+  const item = arquivos.value[index]
+
+  if (item?.url) {
+    URL.revokeObjectURL(item.url)
+  }
+
+  arquivos.value.splice(index, 1)
+}
+
+function moverArquivo(index: number, direcao: -1 | 1) {
+  const destino = index + direcao
+
+  if (
+    destino < 0 ||
+    destino >= arquivos.value.length
+  ) {
+    return
+  }
+
+  const atual = arquivos.value[index]
+  const destinoArquivo = arquivos.value[destino]
+
+  if (!atual || !destinoArquivo) {
+    return
+  }
+
+  arquivos.value[index] = destinoArquivo
+  arquivos.value[destino] = atual
+}
+
+async function processarDocumento() {
+  if (!podeProcessar.value) return
+
+  erro.value = ''
+  preview.value = null
+  formulario.value = null
   processando.value = true
 
   try {
     const resultado =
-      await documentoImportacaoService
-        .gerarPreview(arquivo)
+      await documentoImportacaoService.gerarPreview(
+        arquivos.value.map((item) => item.arquivo),
+      )
 
     preview.value = resultado
-
-    const clienteSugerido =
-      resultado.sugestoes.cliente
-
-    formulario.value = {
-      numero_pedido:
-        resultado.dados.numero_pedido ?? '',
-
-      cliente_id:
-        clienteSugerido?.id ?? null,
-
-      cliente: {
-        codigo_externo:
-          resultado.dados.cliente
-            .codigo_externo,
-
-        nome:
-          clienteSugerido?.nome ??
-          resultado.dados.cliente.nome ??
-          '',
-
-        apelido:
-          clienteSugerido?.apelido ??
-          resultado.dados.cliente.apelido,
-
-        telefone:
-          clienteSugerido?.telefone ??
-          resultado.dados.cliente.telefone,
-      },
-
-      regiao_id:
-        resultado.sugestoes.regiao?.id ?? 0,
-
-      endereco:
-        resultado.dados.endereco ?? '',
-
-      referencia:
-        resultado.dados.referencia,
-
-      prioridade:
-        resultado.dados.prioridade,
-
-      observacao:
-        resultado.dados.observacao,
-
-      itens:
-        resultado.dados.itens.map((item) => ({
-          ...item,
-        })),
-    }
+    montarFormulario(resultado)
   } catch (e: any) {
     erro.value = extrairErro(e)
   } finally {
@@ -154,18 +205,71 @@ async function arquivoSelecionado(
   }
 }
 
-function usarNovoCliente() {
-  if (!formulario.value) {
-    return
+function montarFormulario(
+  resultado: DocumentoImportacaoPreview,
+) {
+  const clienteSugerido =
+    resultado.sugestoes.cliente
+
+  formulario.value = {
+    numero_pedido:
+      resultado.dados.numero_pedido ?? '',
+
+    cliente_id:
+      clienteSugerido?.id ?? null,
+
+    cliente: {
+      codigo_externo:
+        resultado.dados.cliente.codigo_externo,
+      nome:
+        clienteSugerido?.nome ??
+        resultado.dados.cliente.nome ??
+        '',
+      apelido:
+        clienteSugerido?.apelido ??
+        resultado.dados.cliente.apelido,
+      telefone:
+        clienteSugerido?.telefone ??
+        resultado.dados.cliente.telefone,
+    },
+
+    regiao_id:
+      resultado.sugestoes.regiao?.id ?? 0,
+
+    endereco:
+      resultado.dados.endereco ?? '',
+
+    referencia:
+      resultado.dados.referencia,
+
+    prioridade:
+      resultado.dados.prioridade,
+
+    observacao:
+      resultado.dados.observacao,
+
+    itens:
+      resultado.dados.itens.map((item) => ({
+        ...item,
+      })),
   }
+}
+
+function editarPaginas() {
+  preview.value = null
+  formulario.value = null
+  erro.value = ''
+}
+
+function usarNovoCliente() {
+  if (!formulario.value) return
 
   formulario.value.cliente_id = null
 
   if (preview.value) {
     formulario.value.cliente = {
       codigo_externo:
-        preview.value.dados.cliente
-          .codigo_externo,
+        preview.value.dados.cliente.codigo_externo,
       nome:
         preview.value.dados.cliente.nome ?? '',
       apelido:
@@ -223,10 +327,7 @@ function normalizarPayload(
 ): ConfirmarImportacaoPayload {
   return {
     ...dados,
-
-    numero_pedido:
-      dados.numero_pedido.trim(),
-
+    numero_pedido: dados.numero_pedido.trim(),
     cliente: {
       codigo_externo:
         dados.cliente.codigo_externo?.trim() || null,
@@ -236,13 +337,11 @@ function normalizarPayload(
       telefone:
         dados.cliente.telefone?.trim() || null,
     },
-
     endereco: dados.endereco.trim(),
     referencia:
       dados.referencia?.trim() || null,
     observacao:
       dados.observacao?.trim() || null,
-
     itens: dados.itens.map((item) => ({
       codigo_produto:
         item.codigo_produto?.trim() || null,
@@ -273,28 +372,31 @@ function extrairErro(e: any): string {
 
   return (
     e?.response?.data?.message ??
-    'Não foi possível processar a foto.'
+    'Não foi possível processar o documento.'
   )
 }
 
+function limparArquivos() {
+  arquivos.value.forEach((item) => {
+    if (item.url) {
+      URL.revokeObjectURL(item.url)
+    }
+  })
+
+  arquivos.value = []
+}
+
 function limpar() {
+  limparArquivos()
   preview.value = null
   formulario.value = null
   erro.value = ''
   processando.value = false
   salvando.value = false
-
-  if (imagemUrl.value) {
-    URL.revokeObjectURL(imagemUrl.value)
-    imagemUrl.value = null
-  }
 }
 
 function fechar() {
-  if (processando.value || salvando.value) {
-    return
-  }
-
+  if (processando.value || salvando.value) return
   emit('fechar')
 }
 </script>
@@ -309,14 +411,14 @@ function fechar() {
       <header class="ocr-cabecalho">
         <div>
           <span class="eyebrow">
-            Importação por foto
+            Importação de documento
           </span>
 
           <h2>Importar entrega</h2>
 
           <p>
-            Tire uma foto da nota e confira os dados
-            antes de criar a entrega.
+            Use uma foto, várias fotos da mesma nota
+            ou um PDF digitalizado.
           </p>
         </div>
 
@@ -336,34 +438,44 @@ function fechar() {
         type="file"
         accept="image/*"
         capture="environment"
-        @change="arquivoSelecionado"
+        @change="cameraSelecionada"
       />
 
       <input
-        ref="inputArquivo"
+        ref="inputFotos"
         class="arquivo-oculto"
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        @change="arquivoSelecionado"
+        multiple
+        @change="fotosSelecionadas"
+      />
+
+      <input
+        ref="inputPdf"
+        class="arquivo-oculto"
+        type="file"
+        accept="application/pdf"
+        @change="pdfSelecionado"
       />
 
       <div
         v-if="!preview && !processando"
-        class="selecao-foto"
+        class="selecao-foto selecao-documento"
       >
         <div class="icone-camera">▣</div>
 
-        <h3>Fotografe a nota da entrega</h3>
+        <h3>Adicione a nota</h3>
 
         <p>
-          Deixe o papel o mais reto possível, com boa
-          iluminação e todo o texto dentro da foto.
+          Notas compridas podem ser fotografadas em partes.
+          Mantenha as fotos na ordem: topo, meio e final.
         </p>
 
         <div class="selecao-acoes">
           <button
             class="botao primario"
             type="button"
+            :disabled="temPdf"
             @click="abrirCamera"
           >
             Tirar foto
@@ -372,9 +484,120 @@ function fechar() {
           <button
             class="botao secundario"
             type="button"
-            @click="selecionarArquivo"
+            :disabled="temPdf"
+            @click="selecionarFotos"
           >
-            Selecionar imagem
+            Selecionar fotos
+          </button>
+
+          <button
+            class="botao secundario"
+            type="button"
+            @click="selecionarPdf"
+          >
+            Selecionar PDF
+          </button>
+        </div>
+
+        <div
+          v-if="arquivos.length"
+          class="paginas-selecionadas"
+        >
+          <div class="paginas-topo">
+            <div>
+              <strong>
+                {{ temPdf ? 'PDF selecionado' : 'Páginas da nota' }}
+              </strong>
+              <span v-if="!temPdf">
+                {{ arquivos.length }} de 12 fotos
+              </span>
+            </div>
+
+            <button
+              class="limpar-paginas"
+              type="button"
+              @click="limparArquivos"
+            >
+              Limpar
+            </button>
+          </div>
+
+          <div class="paginas-grid">
+            <article
+              v-for="(item, index) in arquivos"
+              :key="item.id"
+              class="pagina-card"
+            >
+              <div class="pagina-preview">
+                <img
+                  v-if="item.url"
+                  :src="item.url"
+                  :alt="`Página ${index + 1}`"
+                />
+
+                <div
+                  v-else
+                  class="pdf-preview"
+                >
+                  PDF
+                </div>
+
+                <span class="pagina-numero">
+                  {{ index + 1 }}
+                </span>
+              </div>
+
+              <div class="pagina-nome">
+                {{ item.arquivo.name }}
+              </div>
+
+              <div
+                v-if="!temPdf"
+                class="pagina-acoes"
+              >
+                <button
+                  type="button"
+                  :disabled="index === 0"
+                  title="Mover para cima"
+                  @click="moverArquivo(index, -1)"
+                >
+                  ←
+                </button>
+
+                <button
+                  type="button"
+                  :disabled="index === arquivos.length - 1"
+                  title="Mover para baixo"
+                  @click="moverArquivo(index, 1)"
+                >
+                  →
+                </button>
+
+                <button
+                  type="button"
+                  title="Remover"
+                  @click="removerArquivo(index)"
+                >
+                  ×
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <div class="dica-sobreposicao">
+            <strong>Dica:</strong>
+            em notas grandes, deixe uma pequena sobreposição entre
+            as fotos para não cortar linhas, mas confira os produtos
+            caso o OCR leia algum item duas vezes.
+          </div>
+
+          <button
+            class="botao primario processar-nota"
+            type="button"
+            :disabled="!podeProcessar"
+            @click="processarDocumento"
+          >
+            Processar nota
           </button>
         </div>
       </div>
@@ -386,8 +609,8 @@ function fechar() {
         <div class="spinner"></div>
         <strong>Lendo a nota...</strong>
         <span>
-          Estamos identificando pedido, cliente,
-          endereço e produtos.
+          Estamos juntando as páginas e identificando
+          pedido, cliente, endereço e produtos.
         </span>
       </div>
 
@@ -404,24 +627,43 @@ function fechar() {
         <div class="conferencia-layout">
           <aside class="foto-coluna">
             <div class="foto-sticky">
-              <strong>Foto enviada</strong>
+              <strong>
+                {{
+                  preview.documento.tipo_arquivo === 'PDF'
+                    ? 'PDF enviado'
+                    : `${preview.documento.quantidade_arquivos} foto(s) enviada(s)`
+                }}
+              </strong>
 
-              <img
-                v-if="imagemUrl"
-                :src="imagemUrl"
-                alt="Nota enviada para leitura"
-              />
+              <div class="mini-paginas">
+                <template
+                  v-for="(item, index) in arquivos"
+                  :key="item.id"
+                >
+                  <img
+                    v-if="item.url"
+                    :src="item.url"
+                    :alt="`Página ${index + 1}`"
+                  />
+
+                  <div
+                    v-else
+                    class="pdf-preview lateral"
+                  >
+                    PDF
+                  </div>
+                </template>
+              </div>
 
               <button
                 class="botao secundario trocar-foto"
                 type="button"
-                @click="selecionarArquivo"
+                @click="editarPaginas"
               >
-                Trocar foto
+                Editar páginas
               </button>
             </div>
           </aside>
-
           <div class="dados-coluna">
             <div
               v-if="preview.dados.avisos.length"
@@ -694,6 +936,7 @@ function fechar() {
     </section>
   </div>
 </template>
+
 
 <style scoped>
 * {
@@ -1198,4 +1441,175 @@ function fechar() {
     text-align: center;
   }
 }
+
+
+/* V4 — múltiplas fotos e PDF */
+.selecao-documento {
+  align-items: center;
+}
+
+.paginas-selecionadas {
+  width: min(900px, 100%);
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: #f9fafb;
+  text-align: left;
+}
+
+.paginas-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.paginas-topo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.paginas-topo span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.limpar-paginas {
+  border: 0;
+  background: transparent;
+  color: #b42318;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.paginas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 12px;
+}
+
+.pagina-card {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.pagina-preview {
+  position: relative;
+  height: 155px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #f2f4f7;
+}
+
+.pagina-preview img,
+.mini-paginas img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #f2f4f7;
+}
+
+.pagina-numero {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #101828;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pagina-nome {
+  overflow: hidden;
+  margin-top: 7px;
+  color: #344054;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pagina-acoes {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.pagina-acoes button {
+  flex: 1;
+  height: 30px;
+  border: 1px solid #d0d5dd;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.pagina-acoes button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.pdf-preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.pdf-preview.lateral {
+  height: 180px;
+  border-radius: 10px;
+}
+
+.dica-sobreposicao {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: #eff8ff;
+  color: #175cd3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.processar-nota {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.mini-paginas {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mini-paginas img {
+  max-height: 220px;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+}
+
+@media (max-width: 720px) {
+  .paginas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pagina-preview {
+    height: 130px;
+  }
+}
+
 </style>
