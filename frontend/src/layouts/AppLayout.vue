@@ -53,6 +53,11 @@ async function sair() {
           <span>!</span>
           Pendências
         </RouterLink>
+
+        <RouterLink to="/relatorios">
+          <span>▦</span>
+          Relatórios
+        </RouterLink>
       </nav>
 
       <div class="usuario">

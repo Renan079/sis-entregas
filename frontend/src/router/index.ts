@@ -10,6 +10,7 @@ import RegioesView from '@/pages/Regioes/RegioesView.vue'
 import EntregasView from '@/pages/Entregas/EntregasView.vue'
 import SaidasView from '@/pages/Saidas/SaidasView.vue'
 import PendenciasView from '@/pages/Pendencias/PendenciasView.vue'
+import RelatoriosView from '@/pages/Relatorios/RelatoriosView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -66,6 +67,12 @@ const router = createRouter({
           path: 'pendencias',
           name: 'pendencias',
           component: PendenciasView,
+        },
+
+        {
+          path: 'relatorios',
+          name: 'relatorios',
+          component: RelatoriosView,
         },
       ],
     },

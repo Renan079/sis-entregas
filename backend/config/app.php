@@ -67,6 +67,11 @@ return [
 
     'timezone' => 'UTC',
 
+    'operation_timezone' => env(
+    'APP_OPERATION_TIMEZONE',
+    'America/Fortaleza'
+    ),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

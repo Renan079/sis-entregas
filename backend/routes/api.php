@@ -13,6 +13,7 @@ use App\Http\Controllers\PendenciaController;
 use App\Http\Controllers\ClienteHistoricoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentoImportacaoController;
+use App\Http\Controllers\RelatorioController;
 
 Route::middleware('auth:sanctum')->group(function () {
 
@@ -176,6 +177,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post(
         '/documentos/{documentoId}/confirmar',
         [DocumentoImportacaoController::class, 'confirmar']
+    );
+
+    Route::get(
+        '/relatorios',
+        [RelatorioController::class, 'index']
     );
 
 });

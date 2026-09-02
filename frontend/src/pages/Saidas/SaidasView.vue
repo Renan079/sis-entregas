@@ -1418,7 +1418,21 @@ function statusLabel(
 }
 
 function formatarData(data: string) {
-  const [ano, mes, dia] = data.split('-')
+  if (!data) {
+    return '—'
+  }
+
+  const somenteData = data.split('T')[0]
+
+  if (!somenteData) {
+    return '—'
+  }
+
+  const [ano, mes, dia] = somenteData.split('-')
+
+  if (!ano || !mes || !dia) {
+    return data
+  }
 
   return `${dia}/${mes}/${ano}`
 }

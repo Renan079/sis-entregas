@@ -467,9 +467,16 @@ function fechar() {
         <h3>Adicione a nota</h3>
 
         <p>
-          Notas compridas podem ser fotografadas em partes.
-          Mantenha as fotos na ordem: topo, meio e final.
+          Para notas pequenas, use uma foto. Para notas longas,
+          prefira um PDF digitalizado. Várias fotos continuam
+          disponíveis como alternativa.
         </p>
+
+        <div class="recomendacao-pdf">
+          <strong>Nota longa?</strong>
+          Prefira PDF digitalizado para melhorar enquadramento,
+          nitidez e leitura do OCR.
+        </div>
 
         <div class="selecao-acoes">
           <button
@@ -584,11 +591,14 @@ function fechar() {
             </article>
           </div>
 
-          <div class="dica-sobreposicao">
-            <strong>Dica:</strong>
-            em notas grandes, deixe uma pequena sobreposição entre
-            as fotos para não cortar linhas, mas confira os produtos
-            caso o OCR leia algum item duas vezes.
+          <div
+            v-if="!temPdf"
+            class="dica-sobreposicao"
+          >
+            <strong>Usando várias fotos?</strong>
+            Deixe uma pequena sobreposição entre elas para não cortar
+            linhas e confira os produtos caso o OCR leia algum item
+            duas vezes.
           </div>
 
           <button
@@ -1610,6 +1620,23 @@ function fechar() {
   .pagina-preview {
     height: 130px;
   }
+}
+
+
+.recomendacao-pdf {
+  width: min(620px, 100%);
+  margin: 4px 0 18px;
+  padding: 11px 13px;
+  border: 1px solid #b2ddff;
+  border-radius: 10px;
+  background: #eff8ff;
+  color: #175cd3;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.recomendacao-pdf strong {
+  color: #1849a9;
 }
 
 </style>
