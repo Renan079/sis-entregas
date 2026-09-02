@@ -11,6 +11,12 @@ import EntregasView from '@/pages/Entregas/EntregasView.vue'
 import SaidasView from '@/pages/Saidas/SaidasView.vue'
 import PendenciasView from '@/pages/Pendencias/PendenciasView.vue'
 import RelatoriosView from '@/pages/Relatorios/RelatoriosView.vue'
+import SaidaDetalheView from '@/pages/Saidas/SaidaDetalheView.vue'
+import SaidaNovaView from '@/pages/Saidas/SaidaNovaView.vue'
+import SaidaHistoricoView from '@/pages/Saidas/SaidaHistoricoView.vue'
+import EntregaHistoricoView from '@/pages/Entregas/EntregaHistoricoView.vue'
+import EntregaFormularioView from '@/pages/Entregas/EntregaFormularioView.vue'
+import ClienteHistoricoView from '@/pages/Clientes/ClienteHistoricoView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +52,12 @@ const router = createRouter({
         },
 
         {
+          path: 'clientes/:id/historico',
+          name: 'cliente-historico',
+          component: ClienteHistoricoView,
+        },
+
+        {
           path: 'regioes',
           name: 'regioes',
           component: RegioesView,
@@ -56,11 +68,41 @@ const router = createRouter({
           name: 'entregas',
           component: EntregasView,
         },
+        {
+          path: 'entregas/nova',
+          name: 'entrega-nova',
+          component: EntregaFormularioView,
+        },
+        {
+          path: 'entregas/:id/editar',
+          name: 'entrega-editar',
+          component: EntregaFormularioView,
+        },
+        {
+          path: 'entregas/:id/historico',
+          name: 'entrega-historico',
+          component: EntregaHistoricoView,
+        },
 
         {
           path: 'saidas',
           name: 'saidas',
           component: SaidasView,
+        },
+        {
+          path: 'saidas/nova',
+          name: 'saida-nova',
+          component: SaidaNovaView,
+        },
+        {
+          path: 'saidas/:id',
+          name: 'saida-detalhe',
+          component: SaidaDetalheView,
+        },
+        {
+          path: 'saidas/:id/historico',
+          name: 'saida-historico',
+          component: SaidaHistoricoView,
         },
 
         {

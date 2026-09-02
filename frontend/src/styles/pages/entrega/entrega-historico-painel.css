@@ -1,0 +1,457 @@
+* {
+  box-sizing: border-box;
+}
+
+.historico-conteudo {
+  width: 100%;
+  max-width: 1180px;
+  padding: 26px;
+  border: 1px solid #e4e7ec;
+  border-radius: 14px;
+  background: white;
+  color: #172033;
+}
+
+.historico-identificacao {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.historico-identificacao > div {
+  padding: 14px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.historico-identificacao small,
+.historico-identificacao strong {
+  display: block;
+}
+
+.historico-identificacao small {
+  margin-bottom: 5px;
+  color: #667085;
+}
+
+.historico-secao {
+  margin-top: 28px;
+}
+
+.historico-secao:first-of-type {
+  margin-top: 0;
+}
+
+.historico-titulo {
+  margin-bottom: 14px;
+}
+
+.historico-titulo h3 {
+  margin: 0;
+}
+
+.historico-titulo p {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.historico-produto {
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+}
+
+.historico-produto-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.historico-produto-topo small {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+}
+
+.historico-resumo-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.historico-indicador {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.historico-indicador small,
+.historico-indicador strong {
+  display: block;
+}
+
+.historico-indicador small {
+  margin-bottom: 4px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.historico-indicador.entregue {
+  background: #ecfdf3;
+}
+
+.historico-indicador.entregue strong {
+  color: #027a48;
+}
+
+.historico-indicador.saldo {
+  background: #eff6ff;
+}
+
+.historico-indicador.saldo strong {
+  color: #1d4ed8;
+}
+
+.historico-indicador.pendente {
+  background: #fff7ed;
+}
+
+.historico-indicador.pendente strong {
+  color: #c2410c;
+}
+
+.historico-explicacao {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eaecf0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.historico-evento {
+  position: relative;
+  margin-bottom: 14px;
+  padding: 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+}
+
+.historico-evento-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.historico-evento-topo div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.historico-evento-topo span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.resultado-historico {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.resultado-historico.completa {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.resultado-historico.parcial {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.resultado-historico.nao_entregue {
+  background: #fef2f2;
+  color: #b42318;
+}
+
+.historico-veiculo {
+  margin-bottom: 12px;
+  color: #667085;
+  font-size: 13px;
+}
+
+.historico-itens-tentativa {
+  overflow: hidden;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+}
+
+.historico-item-cabecalho,
+.historico-item-linha {
+  display: grid;
+  grid-template-columns: 3fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.historico-item-cabecalho {
+  background: #f9fafb;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.historico-item-linha {
+  border-top: 1px solid #eaecf0;
+  font-size: 13px;
+}
+
+.historico-item-linha small {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+}
+
+.quantidade-entregue {
+  color: #027a48;
+}
+
+.quantidade-faltante {
+  color: #b42318;
+}
+
+.historico-observacoes {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+  font-size: 13px;
+}
+
+.historico-observacoes p {
+  margin: 0;
+}
+
+.historico-observacoes p + p {
+  margin-top: 6px;
+}
+
+.historico-pendencia {
+  position: relative;
+  margin-bottom: 10px;
+  padding: 14px;
+  border: 1px solid #fedf89;
+  border-radius: 10px;
+  background: #fffaeb;
+}
+
+.historico-pendencia > div:first-child {
+  padding-right: 110px;
+}
+
+.historico-pendencia small {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+}
+
+.historico-pendencia-quantidades {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.pendencia-status {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pendencia-status.aberta,
+.pendencia-status.programada {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.pendencia-status.resolvida {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.pendencia-status.cancelada {
+  background: #f2f4f7;
+  color: #667085;
+}
+
+.historico-pendencia-motivo {
+  margin: 10px 0 0;
+  color: #667085;
+  font-size: 13px;
+}
+
+.historico-vazio {
+  padding: 22px;
+  border: 1px dashed #d0d5dd;
+  border-radius: 10px;
+  color: #667085;
+  text-align: center;
+}
+
+@media (max-width: 1000px) {
+  .historico-resumo-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .historico-identificacao {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .historico-conteudo {
+    padding: 18px;
+  }
+
+  .historico-resumo-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .historico-item-cabecalho {
+    display: none;
+  }
+
+  .historico-item-linha {
+    grid-template-columns: 1fr;
+  }
+
+  .historico-evento-topo {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .historico-pendencia > div:first-child {
+    padding-right: 0;
+  }
+
+  .pendencia-status {
+    position: static;
+    display: inline-flex;
+    margin-top: 10px;
+  }
+}
+
+/* ==============================
+   VISUAL V1 — PAINEL HISTÓRICO ENTREGA
+   ============================== */
+.historico-conteudo {
+  max-width: 1220px;
+  border-color: var(--se-border);
+  border-radius: var(--se-radius-lg);
+  background: var(--se-surface);
+  color: var(--se-text);
+}
+
+.historico-identificacao > div {
+  border-color: var(--se-border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfdff, #f7faff);
+}
+
+.historico-identificacao small,
+.historico-titulo p,
+.historico-produto-topo small,
+.historico-evento-topo span,
+.historico-veiculo,
+.historico-explicacao {
+  color: var(--se-text-muted);
+}
+
+.historico-secao h3,
+.historico-produto strong {
+  color: var(--se-navy-900);
+}
+
+.historico-produto,
+.historico-evento {
+  border-color: var(--se-border);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--se-shadow-xs);
+}
+
+.historico-indicador {
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  background: var(--se-gray-50);
+}
+
+.historico-indicador.entregue {
+  border-color: #bbf7d0;
+  background: var(--se-green-50);
+}
+
+.historico-indicador.saldo {
+  border-color: #bfdbfe;
+  background: var(--se-blue-50);
+}
+
+.historico-indicador.pendente {
+  border-color: #fed7aa;
+  background: var(--se-orange-50);
+}
+
+.historico-itens-tentativa {
+  border-color: var(--se-border);
+  border-radius: 11px;
+}
+
+.historico-item-cabecalho {
+  background: #f7faff;
+}
+
+.historico-pendencia {
+  border-color: #fed7aa;
+  background: var(--se-orange-50);
+}
+
+.resultado-historico.completa,
+.pendencia-status.resolvida {
+  border: 1px solid #bbf7d0;
+  background: var(--se-green-50);
+  color: var(--se-green-700);
+}
+
+.resultado-historico.parcial,
+.pendencia-status.aberta,
+.pendencia-status.programada {
+  border: 1px solid #fed7aa;
+  background: var(--se-orange-50);
+  color: var(--se-orange-700);
+}
+
+.resultado-historico.nao_entregue {
+  border: 1px solid #fecaca;
+  background: var(--se-red-50);
+  color: var(--se-red-700);
+}

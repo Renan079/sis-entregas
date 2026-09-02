@@ -1,0 +1,71 @@
+.carrada-detalhe-page {
+  max-width: 1500px;
+}
+
+.carrada-detalhe-topo {
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.voltar-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #475467;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.voltar-link:hover {
+  color: #172033;
+}
+
+.carrada-detalhes-painel {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 6%);
+  padding: 24px;
+}
+
+.carrada-detalhes-painel > .modal-cabecalho {
+  margin-bottom: 20px;
+}
+
+.carrada-detalhes-painel > .modal-acoes {
+  margin-top: 24px;
+  padding-top: 20px;
+}
+
+@media (max-width: 800px) {
+  .carrada-detalhes-painel {
+    border-radius: 12px;
+    padding: 16px;
+  }
+}
+
+/* VISUAL V1 — DETALHE SAÍDA */
+.carrada-detalhe-topo {
+  align-items: flex-start;
+}
+
+.voltar-link {
+  color: var(--se-blue-600);
+}
+
+.voltar-link:hover {
+  color: var(--se-blue-700);
+}
+
+.carrada-detalhes-painel {
+  border-color: var(--se-border);
+  border-radius: var(--se-radius-xl);
+  box-shadow: var(--se-shadow-md);
+}
+
+.carrada-detalhes-painel > .modal-cabecalho {
+  border-bottom-color: var(--se-border);
+}

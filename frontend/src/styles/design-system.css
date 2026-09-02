@@ -1,0 +1,128 @@
+/*
+ * Sistema de Entregas — Design System V1
+ * Identidade: azul + laranja, com foco operacional.
+ */
+:root {
+  --se-navy-950: #07162f;
+  --se-navy-900: #0b1f44;
+  --se-navy-800: #123465;
+
+  --se-blue-700: #124bcc;
+  --se-blue-600: #155eef;
+  --se-blue-500: #2563eb;
+  --se-blue-100: #dbeafe;
+  --se-blue-50: #eff6ff;
+
+  --se-orange-700: #c2410c;
+  --se-orange-600: #ea580c;
+  --se-orange-500: #f97316;
+  --se-orange-100: #ffedd5;
+  --se-orange-50: #fff7ed;
+
+  --se-green-700: #027a48;
+  --se-green-600: #039855;
+  --se-green-50: #ecfdf3;
+
+  --se-red-700: #b42318;
+  --se-red-600: #d92d20;
+  --se-red-50: #fef3f2;
+
+  --se-gray-950: #172033;
+  --se-gray-700: #344054;
+  --se-gray-600: #475467;
+  --se-gray-500: #667085;
+  --se-gray-300: #d0d5dd;
+  --se-gray-200: #e4e7ec;
+  --se-gray-100: #f2f4f7;
+  --se-gray-50: #f8fafc;
+
+  --se-bg: #f5f7fb;
+  --se-surface: #ffffff;
+  --se-border: #e4e7ec;
+  --se-border-strong: #d0d5dd;
+  --se-text: #172033;
+  --se-text-muted: #667085;
+
+  --se-radius-sm: 8px;
+  --se-radius-md: 12px;
+  --se-radius-lg: 16px;
+  --se-radius-xl: 20px;
+
+  --se-shadow-xs: 0 1px 2px rgb(15 23 42 / 4%);
+  --se-shadow-sm: 0 5px 16px rgb(15 23 42 / 6%);
+  --se-shadow-md: 0 14px 36px rgb(15 23 42 / 8%);
+  --se-shadow-blue: 0 8px 20px rgb(21 94 239 / 18%);
+
+  --se-transition: 160ms ease;
+}
+
+html {
+  min-width: 320px;
+  background: var(--se-bg);
+  color-scheme: light;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--se-bg);
+  color: var(--se-text);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgb(21 94 239 / 18%);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--se-blue-100);
+  color: var(--se-navy-900);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #edf1f7;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid #edf1f7;
+  border-radius: 999px;
+  background: #b8c3d4;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #93a4bb;
+}

@@ -1640,3 +1640,102 @@ function fechar() {
 }
 
 </style>
+
+<style scoped>
+/* ==============================
+   VISUAL V1 — OCR / IMPORTAÇÃO
+   ============================== */
+.ocr-fundo {
+  background: rgb(7 22 47 / 66%);
+  backdrop-filter: blur(4px);
+}
+
+.ocr-modal {
+  border: 1px solid rgb(228 231 236 / 90%);
+  border-radius: 20px;
+  background: var(--se-surface);
+  box-shadow: 0 28px 80px rgb(7 22 47 / 28%);
+}
+
+.ocr-cabecalho {
+  border-bottom-color: var(--se-border);
+}
+
+.ocr-cabecalho h2,
+.dados-coluna h3,
+.foto-coluna h3 {
+  color: var(--se-navy-900);
+}
+
+.ocr-cabecalho p,
+.seguranca,
+.sugestao,
+.ajuda {
+  color: var(--se-text-muted);
+}
+
+.selecao-documento,
+.pagina-preview,
+.produto,
+.pdf-preview,
+.foto-sticky {
+  border-color: var(--se-border);
+  border-radius: 14px;
+}
+
+.selecao-documento:hover {
+  border-color: #93b4fd;
+  background: var(--se-blue-50);
+}
+
+.icone-camera {
+  background: var(--se-blue-50);
+  color: var(--se-blue-600);
+}
+
+.recomendacao-pdf {
+  border-color: #fed7aa;
+  background: var(--se-orange-50);
+  color: var(--se-orange-700);
+}
+
+input,
+select,
+textarea {
+  border-color: var(--se-border-strong);
+  border-radius: 10px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--se-blue-500);
+  outline: none;
+  box-shadow: 0 0 0 4px rgb(21 94 239 / 10%);
+}
+
+.botao {
+  border-radius: 10px;
+  transition: var(--se-transition);
+}
+
+.botao.primario,
+.processar-nota {
+  border-color: var(--se-blue-600);
+  background: linear-gradient(135deg, var(--se-blue-600), var(--se-blue-500));
+  color: #fff;
+  box-shadow: var(--se-shadow-blue);
+}
+
+.botao.secundario {
+  border-color: var(--se-border-strong);
+  background: #fff;
+  color: var(--se-gray-700);
+}
+
+.botao.secundario:hover:not(:disabled) {
+  border-color: #b9cdfd;
+  background: var(--se-blue-50);
+  color: var(--se-blue-700);
+}
+</style>

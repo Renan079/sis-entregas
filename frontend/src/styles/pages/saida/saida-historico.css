@@ -1,0 +1,43 @@
+.carrada-historico-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.carrada-historico-topo {
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.carrada-historico-topo > .botao {
+  flex: 0 0 auto;
+}
+
+.historico-carrada-painel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+@media (max-width: 800px) {
+  .carrada-historico-topo {
+    flex-direction: column;
+  }
+
+  .carrada-historico-topo > .botao {
+    width: 100%;
+  }
+}
+
+/* VISUAL V1 — HISTÓRICO SAÍDA */
+.carrada-historico-page {
+  gap: 24px;
+}
+
+.carrada-historico-topo {
+  padding-bottom: 4px;
+}
+
+.historico-carrada-painel {
+  gap: 22px;
+}
