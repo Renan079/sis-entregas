@@ -1,79 +1,122 @@
-# Modelo de Entidades
+Modelo de Entidades
 
-## 1. Objetivo
+1. Objetivo
 
 Este documento descreve o modelo de dados atual do Sistema de Gerenciamento de Entregas.
 
-O foco é registrar:
+O objetivo é registrar:
 
-- principais entidades;
-- responsabilidade de cada tabela;
-- relacionamentos;
-- regras estruturais importantes;
-- entidades de histórico;
-- entidades utilizadas em pendências, reentregas e devoluções.
+principais entidades;
 
-Este documento deve ser atualizado sempre que uma alteração estrutural relevante for feita no banco de dados.
+responsabilidade de cada tabela;
 
----
+relacionamentos;
 
-# 2. Visão geral do domínio
+estados importantes;
 
-O núcleo do sistema pode ser dividido em seis grupos:
+entidades de histórico;
 
-1. **Cadastros**
-   - clientes;
-   - regiões;
-   - funcionários;
-   - veículos;
-   - usuários.
+entidades de autenticação;
 
-2. **Entrega**
-   - entregas;
-   - entrega_items.
+entidades de importação e OCR;
 
-3. **Carrada**
-   - saidas;
-   - saida_entregas;
-   - saida_entrega_itens;
-   - saida_equipes;
-   - saida_eventos.
+entidades utilizadas em entregas, carradas, pendências, reentregas e devoluções;
 
-4. **Retorno**
-   - tentativa_entregas;
-   - tentativa_items.
+cálculos derivados do modelo;
 
-5. **Pendências e reentregas**
-   - pendencias;
-   - pendencia_movimentacoes;
-   - saida_pendencias;
-   - saida_pendencia_retornos.
+regras estruturais que devem ser preservadas.
 
-6. **Devoluções e histórico**
-   - devolucoes;
-   - entrega_eventos;
-   - ocorrencias_operacionais;
-   - documento_importados.
+Este documento deve ser atualizado sempre que houver alteração estrutural relevante no banco de dados.
 
----
+Observação: quando o tipo físico exato de uma coluna não é essencial para compreender o domínio, este documento descreve a função do campo em vez de tentar substituir as migrations como fonte definitiva do schema.
 
-# 3. Diagrama geral
+2. Visão geral do domínio
 
-```mermaid
+O sistema pode ser dividido nos seguintes grupos.
+
+2.1 Autenticação e usuários
+
+users;
+
+estruturas de sessão utilizadas pelo Laravel, quando aplicável.
+
+2.2 Cadastros
+
+clientes;
+
+regiaos;
+
+funcionarios;
+
+veiculos.
+
+2.3 Importação
+
+documento_importados.
+
+2.4 Entregas
+
+entregas;
+
+entrega_items;
+
+entrega_eventos.
+
+2.5 Carradas
+
+saidas;
+
+saida_entregas;
+
+saida_entrega_itens;
+
+saida_equipes;
+
+saida_eventos.
+
+2.6 Tentativas de entrega
+
+tentativa_entregas;
+
+tentativa_items.
+
+2.7 Pendências e reentregas
+
+pendencias;
+
+pendencia_movimentacoes;
+
+saida_pendencias;
+
+saida_pendencia_retornos.
+
+2.8 Devoluções e ocorrências
+
+devolucoes;
+
+ocorrencias_operacionais.
+
+3. Diagrama geral
+
 erDiagram
+    USERS ||--o{ ENTREGAS : cria
     USERS ||--o{ SAIDAS : cria
+    USERS ||--o{ DOCUMENTO_IMPORTADOS : importa
     USERS ||--o{ PENDENCIA_MOVIMENTACOES : registra
     USERS ||--o{ DEVOLUCOES : registra
     USERS ||--o{ SAIDA_PENDENCIA_RETORNOS : registra
-
-    REGIAOS ||--o{ ENTREGAS : agrupa
-    REGIAOS ||--o{ SAIDAS : principal
+    USERS ||--o{ ENTREGA_EVENTOS : registra
+    USERS ||--o{ SAIDA_EVENTOS : registra
 
     CLIENTES ||--o{ ENTREGAS : possui
-
+    REGIAOS ||--o{ ENTREGAS : agrupa
+    REGIAOS ||--o{ SAIDAS : principal
     VEICULOS ||--o{ SAIDAS : utilizado_em
 
+    DOCUMENTO_IMPORTADOS ||--o| ENTREGAS : pode_originar
+
     ENTREGAS ||--|{ ENTREGA_ITEMS : possui
+    ENTREGAS ||--o{ ENTREGA_EVENTOS : historico
 
     SAIDAS ||--o{ SAIDA_ENTREGAS : possui
     ENTREGAS ||--o{ SAIDA_ENTREGAS : participa
@@ -106,229 +149,623 @@ erDiagram
     PENDENCIAS ||--o{ DEVOLUCOES : origem_reentrega
 
     SAIDAS ||--o{ SAIDA_EVENTOS : historico
-    ENTREGAS ||--o{ ENTREGA_EVENTOS : historico
-```
 
----
+4. Autenticação e usuários
 
-# 4. Cadastros
-
-## 4.1 `users`
+4.1 users
 
 Representa os usuários autenticados do sistema.
 
-É utilizada para identificar quem executou operações importantes.
+Campos conhecidos:
+
+Campo
+
+Função
+
+id
+
+identificador
+
+name
+
+nome do usuário
+
+email
+
+e-mail de autenticação
+
+password
+
+senha armazenada com hash
+
+perfil
+
+perfil de acesso
+
+ativo
+
+controla se a conta pode operar
+
+remember_token
+
+suporte do Laravel, quando utilizado
+
+created_at
+
+criação
+
+updated_at
+
+atualização
+
+Perfis atuais:
+
+ADMIN
+OPERADOR
+
+Regras importantes:
+
+usuário inativo não deve operar o sistema;
+
+senha nunca deve ser persistida em texto puro;
+
+ações administrativas devem ser autorizadas no backend;
+
+não existe cadastro público livre de usuário no fluxo atual.
 
 Relacionamentos relevantes:
 
-- cria carradas;
-- registra movimentações de pendência;
-- registra devoluções;
-- registra retornos de reentregas;
-- pode aparecer em eventos de histórico.
+users 1 ─── N entregas
+users 1 ─── N saidas
+users 1 ─── N documento_importados
+users 1 ─── N pendencia_movimentacoes
+users 1 ─── N devolucoes
+users 1 ─── N eventos
 
----
+5. Cadastros
 
-## 4.2 `clientes`
+5.1 clientes
 
 Representa o cadastro reutilizável de clientes.
 
-Uma entrega também mantém dados operacionais próprios do cliente para permitir que o histórico continue compreensível mesmo que o cadastro seja alterado futuramente.
+Campos conhecidos do domínio:
 
-Relacionamento principal:
+Campo
 
-```text
-clientes 1 ─── N entregas
-```
+Função
 
----
+id
 
-## 4.3 `regiaos`
+identificador
 
-> Nome físico atual da tabela: `regiaos`.
+codigo_externo
 
-Representa regiões utilizadas para organização das entregas e formação das rotas.
+código do cliente em sistema externo, quando existir
 
-É utilizada principalmente em:
+nome
 
-- entrega;
-- região principal da carrada;
-- busca de entregas disponíveis;
-- busca de pendências disponíveis na rota.
+nome principal
 
-Relacionamentos:
+apelido
 
-```text
-regiaos 1 ─── N entregas
-regiaos 1 ─── N saidas
-```
+identificação informal, quando utilizada
 
-A rota completa da carrada não depende somente desta FK, pois também é armazenada como snapshot ordenado em `saidas.rota`.
+telefone
 
----
+telefone
 
-## 4.4 `funcionarios`
+ativo
 
-Representa funcionários que podem participar da operação logística.
+situação cadastral
 
-É utilizada em conjunto com `saida_equipes`.
+created_at
 
----
+criação
 
-## 4.5 `veiculos`
+updated_at
 
-Representa os veículos disponíveis para as carradas.
-
-Campos relevantes conhecidos:
-
-- `id`;
-- `nome`;
-- `placa`;
-- `tipo`;
-- `status`;
-- `observacao`;
-- `ativo`.
-
-Estados utilizados atualmente:
-
-- `DISPONIVEL`;
-- `INDISPONIVEL`;
-- `MANUTENCAO`.
+atualização
 
 Relacionamento:
 
-```text
+clientes 1 ─── N entregas
+
+Snapshot na entrega
+
+A entrega mantém dados próprios do cliente, como:
+
+cliente_nome;
+
+cliente_apelido;
+
+cliente_telefone;
+
+endereço;
+
+referência.
+
+Isso evita que uma alteração posterior no cadastro destrua o significado histórico de uma entrega antiga.
+
+5.2 regiaos
+
+O nome físico da tabela atual é regiaos.
+
+Representa as regiões utilizadas para organização logística.
+
+Campos conceituais conhecidos:
+
+id;
+
+nome;
+
+cidade;
+
+observacao;
+
+ativo;
+
+timestamps.
+
+Relacionamentos:
+
+regiaos 1 ─── N entregas
+regiaos 1 ─── N saidas
+
+Utilizações principais:
+
+filtro de entregas;
+
+organização operacional;
+
+região principal da carrada;
+
+composição da rota;
+
+busca de entregas disponíveis;
+
+busca de pendências disponíveis;
+
+indicadores do Dashboard.
+
+A rota completa não depende apenas de regiao_principal_id, pois saidas.rota funciona como snapshot ordenado.
+
+5.3 funcionarios
+
+Representa funcionários que podem participar da operação logística.
+
+Campos conceituais conhecidos:
+
+id;
+
+nome;
+
+funcao;
+
+pode_dirigir;
+
+ativo;
+
+observacao;
+
+timestamps.
+
+Relacionamento operacional:
+
+funcionarios N ─── N saidas
+          através de saida_equipes
+
+Essa entidade é diferente de users.
+
+funcionarios representa pessoas da operação logística.
+
+users representa contas de acesso ao sistema.
+
+Uma mesma pessoa pode conceitualmente pertencer aos dois contextos, mas eles não devem ser confundidos automaticamente.
+
+5.4 veiculos
+
+Representa os veículos utilizados nas carradas.
+
+Campos conhecidos:
+
+id;
+
+nome;
+
+placa;
+
+tipo;
+
+status;
+
+observacao;
+
+ativo;
+
+timestamps.
+
+Estados utilizados:
+
+DISPONIVEL
+INDISPONIVEL
+MANUTENCAO
+
+Relacionamento:
+
 veiculos 1 ─── N saidas
-```
 
----
+Uma troca de veículo em uma carrada não deve recriar a entrega ou alterar suas quantidades.
 
-# 5. Entrega
+6. Importação de documentos
 
-## 5.1 `entregas`
+6.1 documento_importados
+
+Registra documentos enviados para processamento e OCR.
+
+Diferentemente das versões anteriores da documentação, esta entidade já faz parte do fluxo atual do sistema.
+
+Campos conhecidos:
+
+Campo
+
+Função
+
+id
+
+identificador
+
+usuario_id
+
+usuário que realizou a importação
+
+tipo_arquivo
+
+tipo do arquivo
+
+nome_arquivo
+
+nome do arquivo
+
+arquivo_path
+
+localização armazenada
+
+hash_sha256
+
+hash para rastreabilidade/identificação
+
+status
+
+estado do processamento
+
+texto_extraido
+
+texto resultante do OCR
+
+dados_extraidos
+
+representação estruturada, quando disponível
+
+erro_processamento
+
+informação de falha, quando existir
+
+created_at
+
+momento da importação
+
+Relacionamentos conceituais:
+
+users 1 ─── N documento_importados
+
+documento_importados 1 ─── 0..1 entregas
+
+A entrega pode possuir:
+
+documento_importado_id
+
+para manter vínculo com sua origem.
+
+6.2 Função histórica do documento
+
+O documento importado não deve existir apenas como arquivo temporário sem contexto.
+
+Ele permite rastrear:
+
+arquivo recebido
+→ texto extraído
+→ dados interpretados
+→ conferência
+→ entrega gerada
+
+6.3 OCR não substitui os dados confirmados
+
+texto_extraido e dados_extraidos representam resultado automático.
+
+A entrega definitiva representa os dados confirmados pelo operador.
+
+Portanto:
+
+resultado OCR
+!=
+verdade definitiva da entrega
+
+O usuário pode corrigir a prévia antes da criação.
+
+7. Entregas
+
+7.1 entregas
 
 É a entidade principal do pedido logístico.
 
-Representa aquilo que precisa chegar até o cliente.
+Campos conhecidos:
 
-Informações relevantes:
+Campo
 
-- número do pedido;
-- cliente;
-- região;
-- endereço;
-- prioridade;
-- status;
-- observação;
-- dados auxiliares do cliente.
+Função
+
+id
+
+identificador interno
+
+numero_pedido
+
+número do pedido externo
+
+documento_importado_id
+
+documento de origem, quando existir
+
+cliente_id
+
+cliente cadastrado, quando utilizado
+
+regiao_id
+
+região
+
+cliente_nome
+
+snapshot do nome
+
+cliente_apelido
+
+snapshot do apelido
+
+cliente_telefone
+
+snapshot do telefone
+
+endereco
+
+endereço da entrega
+
+referencia
+
+referência de localização
+
+prioridade
+
+prioridade operacional
+
+status
+
+estado da entrega
+
+observacao
+
+observações
+
+criado_por
+
+usuário responsável pelo cadastro
+
+created_at
+
+data de lançamento no sistema
+
+updated_at
+
+última atualização
+
+Prioridades atuais:
+
+BAIXA
+NORMAL
+ALTA
+URGENTE
 
 Estados atuais:
 
-- `PENDENTE`;
-- `PROGRAMADA`;
-- `EM_SAIDA`;
-- `PARCIAL`;
-- `CONCLUIDA`;
-- `NAO_ENTREGUE`;
-- `CANCELADA`.
+PENDENTE
+PROGRAMADA
+EM_SAIDA
+PARCIAL
+CONCLUIDA
+NAO_ENTREGUE
+CANCELADA
 
-Relacionamentos principais:
+Relacionamentos:
 
-```text
+cliente 1 ─── N entregas
+regiao 1 ─── N entregas
+
 entregas 1 ─── N entrega_items
 entregas 1 ─── N saida_entregas
 entregas 1 ─── N tentativa_entregas
 entregas 1 ─── N pendencias
 entregas 1 ─── N devolucoes
 entregas 1 ─── N entrega_eventos
-```
 
-### Regra importante
+7.2 created_at como data operacional de entrada
 
-Uma entrega pode participar de várias carradas.
+entregas.created_at representa quando a entrega foi lançada no sistema.
+
+Essa data é usada para:
+
+mostrar “Lançada em”;
+
+calcular tempo de espera visual;
+
+ordenar mais antigas primeiro;
+
+ordenar mais recentes primeiro;
+
+destacar pedidos que podem exigir atenção.
+
+Alterar a entrega não deve reescrever sua data original de entrada.
+
+7.3 Uma entrega pode participar de várias carradas
+
+Relacionamento:
+
+entregas N ─── N saidas
+
+através de:
+
+saida_entregas
 
 Isso permite programação parcial.
 
 Exemplo:
 
-```text
 Pedido: 100 blocos
 
 Carrada A: 55
 Carrada B: 45
-```
 
----
+Nenhuma nova entrega é criada apenas porque o pedido foi dividido.
 
-## 5.2 `entrega_items`
+8. Itens da entrega
+
+8.1 entrega_items
 
 Representa cada produto solicitado em uma entrega.
 
-Estrutura atual conhecida:
+Estrutura conhecida:
 
-| Campo | Tipo / característica |
-|---|---|
-| `id` | bigint |
-| `entrega_id` | FK para `entregas` |
-| `codigo_produto` | varchar(80), nullable |
-| `descricao_produto` | varchar(255) |
-| `unidade` | varchar(20), nullable |
-| `quantidade_solicitada` | numeric(12,3) |
-| `observacao` | text, nullable |
-| `created_at` | timestamp |
-| `updated_at` | timestamp |
+Campo
+
+Tipo / característica
+
+id
+
+bigint
+
+entrega_id
+
+FK para entregas
+
+codigo_produto
+
+varchar, nullable
+
+descricao_produto
+
+descrição do item
+
+unidade
+
+unidade, nullable
+
+quantidade_solicitada
+
+quantidade solicitada
+
+observacao
+
+texto opcional
+
+created_at
+
+timestamp
+
+updated_at
+
+timestamp
 
 Relacionamento:
 
-```text
 entregas 1 ─── N entrega_items
-```
 
-### Observação importante
+Nome correto da coluna
 
-O nome correto da coluna no banco é:
+O campo atual é:
 
-```text
 descricao_produto
-```
 
-Não utilizar `descricao`.
+Não utilizar:
 
----
+descricao
 
-# 6. Carrada
+quando a operação estiver trabalhando diretamente com entrega_items.
 
-## 6.1 `saidas`
+8.2 Produto não depende de cadastro mestre
+
+No escopo atual, entrega_items não depende de um cadastro central com todos os produtos da loja.
+
+Isso permite importar diretamente itens presentes na nota/documento.
+
+O item conserva:
+
+código;
+
+descrição;
+
+unidade;
+
+quantidade.
+
+9. Carradas
+
+9.1 saidas
 
 Representa uma carrada.
 
 Cada registro corresponde a uma saída física planejada ou realizada.
 
-Campos conceitualmente importantes:
+Campos conceituais importantes:
 
-- `id`;
-- `regiao_principal_id`;
-- `veiculo_id`;
-- `data_saida`;
-- `status`;
-- `rota`;
-- `observacao`;
-- `criado_por`.
+id;
+
+regiao_principal_id;
+
+veiculo_id;
+
+data_saida;
+
+status;
+
+rota;
+
+observacao;
+
+criado_por;
+
+timestamps.
 
 Estados:
 
-- `PLANEJADA`;
-- `EM_ANDAMENTO`;
-- `FINALIZADA`;
-- `CANCELADA`.
+PLANEJADA
+EM_ANDAMENTO
+FINALIZADA
+CANCELADA
 
-### Campo `rota`
+Relacionamentos principais:
 
-A rota é armazenada como JSONB.
+veiculo 1 ─── N saidas
+regiao 1 ─── N saidas
+users 1 ─── N saidas
+
+saidas N ─── N entregas
+saidas N ─── N pendencias
+
+9.2 rota
+
+saidas.rota é armazenada como uma estrutura ordenada.
 
 Exemplo:
 
-```json
 [
   {
     "regiao_id": 1,
@@ -343,569 +780,877 @@ Exemplo:
     "nome": "Banco de Areia"
   }
 ]
-```
 
-Esse campo funciona como um snapshot ordenado.
+A rota funciona como snapshot.
 
 Vantagens:
 
-- preserva a ordem;
-- preserva o nome histórico;
-- permite parada livre;
-- evita alterar uma carrada antiga quando o cadastro de região mudar.
+preserva ordem;
 
----
+preserva o nome utilizado no momento;
 
-## 6.2 `saida_entregas`
+aceita parada livre;
+
+evita alteração retroativa em carradas antigas.
+
+10. Entregas dentro da carrada
+
+10.1 saida_entregas
 
 Tabela associativa entre carradas e entregas normais.
 
 Relacionamento:
 
-```text
 saidas N ─── N entregas
-```
 
-Além da associação, guarda informações da participação daquela entrega naquela carrada, como ordem operacional.
+Ela representa:
 
-Estrutura lógica:
+esta entrega participa desta carrada.
 
-```text
-saida
-  └── saida_entrega
-        └── produtos programados
-```
+Também pode manter informações específicas da participação, como ordem operacional.
 
----
+10.2 saida_entrega_itens
 
-## 6.3 `saida_entrega_itens`
+Define quais produtos e quantidades de uma entrega foram programados em uma carrada específica.
 
-Define quais produtos e quantidades de uma entrega foram programados para uma carrada específica.
+Campos conhecidos:
 
-Campos atuais conhecidos:
+id;
 
-- `id`;
-- `saida_entrega_id`;
-- `entrega_item_id`;
-- `quantidade_programada`;
-- timestamps.
+saida_entrega_id;
 
-Existe unicidade para:
+entrega_item_id;
 
-```text
+quantidade_programada;
+
+timestamps.
+
+Existe unicidade conceitualmente importante para:
+
 (saida_entrega_id, entrega_item_id)
-```
 
-### Exemplo
+Exemplo
 
 Pedido:
 
-```text
 100 blocos
-```
 
-Carrada:
+Carrada atual:
 
-```text
 55 blocos
-```
 
-`saida_entrega_itens.quantidade_programada`:
+Então:
 
-```text
-55
-```
+saida_entrega_itens.quantidade_programada = 55
 
-Os outros 45 continuam fora desta carrada.
+Os outros 45 continuam fora dessa programação.
 
----
+10.3 Reserva de quantidade
 
-## 6.4 `saida_equipes`
+Enquanto a carrada estiver:
 
-Relaciona funcionários à carrada.
+PLANEJADA
+ou
+EM_ANDAMENTO sem retorno
 
-Serve para registrar quem participou da viagem.
+a quantidade programada representa uma reserva.
 
-Pode representar, por exemplo:
+Ela não deve aparecer novamente como disponível em outra carrada.
 
-- motorista;
-- ajudante;
-- carregador;
-- outros integrantes.
+11. Equipe da carrada
 
----
+11.1 saida_equipes
 
-## 6.5 `saida_eventos`
+Relaciona funcionários a uma carrada.
+
+Serve para registrar quem participou da operação.
+
+Exemplos de papéis:
+
+motorista;
+
+ajudante;
+
+carregador;
+
+outros papéis definidos pelo domínio.
+
+Relacionamento:
+
+saidas N ─── N funcionarios
+       via saida_equipes
+
+Esse módulo pode evoluir futuramente sem alterar a identidade das entregas já registradas.
+
+12. Eventos da carrada
+
+12.1 saida_eventos
 
 Registra a linha do tempo da carrada.
 
-Campos atuais conhecidos:
+Campos conhecidos:
 
-- `id`;
-- `saida_id`;
-- `usuario_id`;
-- `tipo_evento`;
-- `descricao`;
-- `dados` JSONB;
-- `created_at`.
+id;
 
-Eventos atualmente utilizados ou previstos no fluxo:
+saida_id;
 
-- `SAIDA_CRIADA`;
-- `ENTREGA_ADICIONADA`;
-- `ENTREGA_ATUALIZADA`;
-- `ENTREGA_REMOVIDA`;
-- `PENDENCIA_ADICIONADA`;
-- `PENDENCIA_REMOVIDA`;
-- `SAIDA_INICIADA`;
-- `SAIDA_FINALIZADA`;
-- `VEICULO_TROCADO`;
-- `SAIDA_CANCELADA`;
-- `RESULTADO_ENTREGA_REGISTRADO`;
-- retorno de reentrega.
+usuario_id;
 
-### Objetivo
+tipo_evento;
 
-O evento não substitui os dados operacionais principais.
+descricao;
 
-Ele serve para explicar:
+dados;
 
-> o que aconteceu, quando aconteceu e quem executou a operação.
+created_at.
 
----
+dados pode armazenar JSON com contexto do evento.
 
-# 7. Tentativas de entrega
+Eventos relevantes incluem:
 
-## 7.1 `tentativa_entregas`
+SAIDA_CRIADA
+ENTREGA_ADICIONADA
+ENTREGA_ATUALIZADA
+ENTREGA_REMOVIDA
+PENDENCIA_ADICIONADA
+PENDENCIA_REMOVIDA
+SAIDA_INICIADA
+RESULTADO_ENTREGA_REGISTRADO
+RESULTADO_REENTREGA_REGISTRADO
+VEICULO_TROCADO
+SAIDA_FINALIZADA
+SAIDA_CANCELADA
 
-Representa o resultado de uma entrega normal dentro de uma carrada.
+O evento explica a sequência.
+
+Ele não substitui tabelas operacionais necessárias para cálculo.
+
+13. Tentativas de entrega
+
+13.1 tentativa_entregas
+
+Representa uma tentativa de entrega normal dentro de uma carrada.
 
 Uma tentativa pertence a:
 
-- uma entrega;
-- uma carrada.
+uma entrega;
 
-Armazena informações como:
+uma carrada.
 
-- resultado;
-- motivo da não entrega;
-- observação;
-- data/hora.
+Campos conceituais:
 
-Resultados utilizados:
+id;
 
-- `COMPLETA`;
-- `PARCIAL`;
-- `NAO_ENTREGUE`.
+entrega_id;
 
-### Regra
+saida_id;
 
-Uma entrega não pode ter duas tentativas para a mesma carrada.
+resultado;
 
----
+motivo_nao_entrega;
 
-## 7.2 `tentativa_items`
+observacao;
+
+data_hora;
+
+timestamps.
+
+Resultados:
+
+COMPLETA
+PARCIAL
+NAO_ENTREGUE
+
+Regra importante:
+
+uma entrega não deve possuir dois resultados da mesma natureza
+para a mesma carrada
+
+13.2 tentativa_items
 
 Representa o resultado por produto dentro de uma tentativa.
 
 Campos conceituais:
 
-- `tentativa_id`;
-- `entrega_item_id`;
-- `quantidade_entregue`;
-- observação.
+id;
 
-### Exemplo
+tentativa_id;
 
-Programado:
+entrega_item_id;
 
-```text
-50 argamassas
-```
+quantidade_entregue;
 
-Retorno:
+observacao.
 
-```text
-45 entregues
-```
+Exemplo:
 
-A tentativa registra:
+Programado: 50
+Entregue:   45
 
-```text
+A tabela registra:
+
 quantidade_entregue = 45
-```
 
-Os 5 restantes serão tratados separadamente como:
+Os 5 restantes são tratados separadamente como:
 
-- reentrega; ou
-- devolução.
+REENTREGA
+ou
+DEVOLVIDO
 
----
+14. Pendências
 
-# 8. Pendências
-
-## 8.1 `pendencias`
+14.1 pendencias
 
 Representa uma obrigação de reentrega.
 
-Estrutura atual:
+Estrutura conhecida:
 
-| Campo | Regra |
-|---|---|
-| `id` | PK |
-| `entrega_id` | FK para `entregas` |
-| `entrega_item_id` | FK para `entrega_items` |
-| `tentativa_origem_id` | FK nullable para `tentativa_entregas` |
-| `quantidade_original` | numeric(12,3) |
-| `quantidade_resolvida` | numeric(12,3), default 0 |
-| `motivo` | varchar(100), nullable |
-| `status` | enum |
-| `observacao` | text, nullable |
-| `data_abertura` | timestamptz |
-| `data_resolucao` | timestamptz, nullable |
-| timestamps | Laravel |
+Campo
+
+Regra
+
+id
+
+PK
+
+entrega_id
+
+FK para entregas
+
+entrega_item_id
+
+FK para entrega_items
+
+tentativa_origem_id
+
+tentativa que originou a pendência, quando aplicável
+
+quantidade_original
+
+quantidade originalmente pendente
+
+quantidade_resolvida
+
+quantidade já tratada
+
+motivo
+
+motivo, quando aplicável
+
+status
+
+estado
+
+observacao
+
+texto opcional
+
+data_abertura
+
+abertura
+
+data_resolucao
+
+resolução, quando ocorrer
+
+timestamps
+
+Laravel
 
 Estados:
 
-- `ABERTA`;
-- `PROGRAMADA`;
-- `RESOLVIDA`;
-- `CANCELADA`.
+ABERTA
+PROGRAMADA
+RESOLVIDA
+CANCELADA
 
-### Saldo da pendência
+14.2 Saldo da pendência
 
-```text
-saldo pendente =
-quantidade_original - quantidade_resolvida
-```
+saldo pendente
+=
+quantidade_original
+-
+quantidade_resolvida
 
-### Exemplo
+Exemplo:
 
-```text
-quantidade_original: 5
+quantidade_original:  5
 quantidade_resolvida: 3
-saldo: 2
-```
+saldo:                 2
 
----
+14.3 Pendência não é um novo produto
 
-## 8.2 `pendencia_movimentacoes`
+A pendência referencia:
 
-Mantém o histórico de alterações da pendência.
+entrega_item_id
 
-Estrutura atual:
+Ela não duplica o produto.
 
-| Campo | Descrição |
-|---|---|
-| `id` | PK |
-| `pendencia_id` | FK |
-| `tentativa_id` | FK nullable |
-| `tipo` | tipo da movimentação |
-| `quantidade` | numeric(12,3), nullable |
-| `observacao` | text, nullable |
-| `usuario_id` | usuário responsável |
-| timestamps | Laravel |
+Ela representa uma obrigação logística relacionada a uma quantidade daquele item original.
 
-Tipos atuais:
+15. Histórico da pendência
 
-- `CRIACAO`;
-- `PROGRAMACAO`;
-- `ENTREGA_PARCIAL`;
-- `RESOLUCAO`;
-- `AJUSTE`;
-- `CANCELAMENTO`.
+15.1 pendencia_movimentacoes
 
-### Objetivo
+Registra como o estado da pendência evoluiu.
 
-Enquanto `pendencias` representa o estado atual, `pendencia_movimentacoes` explica como esse estado foi alcançado.
+Campos conhecidos:
 
----
+Campo
 
-# 9. Reentrega
+Função
 
-## 9.1 `saida_pendencias`
+id
+
+identificador
+
+pendencia_id
+
+pendência
+
+tentativa_id
+
+tentativa relacionada, quando existir
+
+tipo
+
+tipo de movimentação
+
+quantidade
+
+quantidade relacionada
+
+observacao
+
+observação
+
+usuario_id
+
+responsável
+
+timestamps
+
+Laravel
+
+Tipos conhecidos:
+
+CRIACAO
+PROGRAMACAO
+ENTREGA_PARCIAL
+RESOLUCAO
+AJUSTE
+CANCELAMENTO
+
+Princípio:
+
+pendencias
+→ estado atual
+
+pendencia_movimentacoes
+→ como o estado foi alcançado
+
+16. Programação de reentrega
+
+16.1 saida_pendencias
 
 Tabela associativa entre carrada e pendência.
 
 Representa:
 
-> esta pendência foi programada para esta carrada.
+esta pendência foi programada nesta carrada.
 
 Relacionamento:
 
-```text
 saidas N ─── N pendencias
-```
 
-### Fluxo
+Fluxo:
 
-```text
 Pendência ABERTA
       ↓
-adicionar à carrada
+adicionada à carrada
       ↓
 saida_pendencias
       ↓
 Pendência PROGRAMADA
-```
 
-Se for removida enquanto a carrada estiver planejada:
+Se removida de carrada ainda planejada:
 
-```text
 PROGRAMADA → ABERTA
-```
 
----
+17. Retorno de reentrega
 
-## 9.2 `saida_pendencia_retornos`
+17.1 saida_pendencia_retornos
 
 Registra o resultado específico de uma reentrega.
 
-Foi criada porque uma reentrega não deve ser confundida com uma tentativa de entrega normal.
+Essa tabela é necessária porque reentrega é uma operação diferente de uma tentativa normal.
 
-Estrutura atual:
+Estrutura conhecida:
 
-| Campo | Descrição |
-|---|---|
-| `id` | PK |
-| `saida_id` | carrada |
-| `pendencia_id` | pendência reentregue |
-| `quantidade_programada` | saldo levado para reentrega |
-| `quantidade_entregue` | quantidade entregue nessa reentrega |
-| `quantidade_devolvida` | quantidade encerrada como devolvida |
-| `quantidade_reentrega` | quantidade que continuará pendente |
-| `destino_restante` | `REENTREGA` ou `DEVOLVIDO` |
-| `motivo_devolucao` | motivo, quando houver |
-| `observacao` | observação |
-| `registrado_por` | FK para `users` |
-| `data_hora` | data/hora do retorno |
-| timestamps | Laravel |
+Campo
 
-Existe restrição única:
+Função
 
-```text
+id
+
+PK
+
+saida_id
+
+carrada
+
+pendencia_id
+
+pendência
+
+quantidade_programada
+
+quantidade levada
+
+quantidade_entregue
+
+entregue na reentrega
+
+quantidade_devolvida
+
+encerrada como devolução
+
+quantidade_reentrega
+
+quantidade que continuará pendente
+
+destino_restante
+
+REENTREGA ou DEVOLVIDO
+
+motivo_devolucao
+
+motivo, quando necessário
+
+observacao
+
+observação
+
+registrado_por
+
+usuário
+
+data_hora
+
+momento do retorno
+
+timestamps
+
+Laravel
+
+Restrição importante:
+
 (saida_id, pendencia_id)
-```
 
-Isso garante um único retorno da mesma pendência dentro da mesma carrada.
+deve identificar um único retorno daquela pendência naquela carrada.
 
-### Exemplo
+17.2 Exemplo de retorno parcial
 
-Pendência:
+Pendência original:
 
-```text
 5 argamassas
-```
-
-Retorno:
-
-```text
-quantidade_programada: 5
-quantidade_entregue: 3
-quantidade_devolvida: 0
-quantidade_reentrega: 2
-destino_restante: REENTREGA
-```
 
 Resultado:
 
-```text
+quantidade_programada: 5
+quantidade_entregue:   3
+quantidade_devolvida:  0
+quantidade_reentrega:  2
+destino_restante: REENTREGA
+
+Consequência:
+
 3 resolvidas
-2 continuam aguardando nova carrada
-```
+2 continuam pendentes
 
----
+18. Devoluções
 
-# 10. Devoluções
-
-## 10.1 `devolucoes`
+18.1 devolucoes
 
 Representa uma quantidade encerrada logisticamente sem entrega ao cliente.
 
-Estrutura atual:
+Estrutura conhecida:
 
-| Campo | Descrição |
-|---|---|
-| `id` | PK |
-| `entrega_id` | entrega relacionada |
-| `entrega_item_id` | produto |
-| `saida_id` | carrada, nullable |
-| `tentativa_origem_id` | tentativa normal, nullable |
-| `pendencia_id` | pendência/reentrega, nullable |
-| `quantidade` | numeric(12,3) |
-| `motivo` | código do motivo |
-| `observacao` | texto opcional |
-| `registrado_por` | FK para `users` |
-| `data_hora` | timestamptz |
-| timestamps | Laravel |
+Campo
 
-Motivos atualmente previstos:
+Função
 
-- `CLIENTE_RECUSOU`;
-- `CLIENTE_DESISTIU`;
-- `PRODUTO_INCORRETO`;
-- `PRODUTO_AVARIADO`;
-- `QUANTIDADE_EXCEDENTE`;
-- `OUTRO`.
+id
 
-### Origem da devolução
+PK
 
-Uma devolução pode nascer de dois fluxos.
+entrega_id
 
-#### Entrega normal
+entrega
 
-```text
+entrega_item_id
+
+item
+
+saida_id
+
+carrada, quando aplicável
+
+tentativa_origem_id
+
+tentativa normal de origem, quando aplicável
+
+pendencia_id
+
+pendência/reentrega de origem, quando aplicável
+
+quantidade
+
+quantidade devolvida
+
+motivo
+
+motivo
+
+observacao
+
+observação
+
+registrado_por
+
+usuário
+
+data_hora
+
+momento
+
+timestamps
+
+Laravel
+
+Motivos previstos:
+
+CLIENTE_RECUSOU
+CLIENTE_DESISTIU
+PRODUTO_INCORRETO
+PRODUTO_AVARIADO
+QUANTIDADE_EXCEDENTE
+OUTRO
+
+18.2 Origem da devolução
+
+Uma devolução pode vir de uma entrega normal:
+
 tentativa_origem_id != null
-pendencia_id = null
-```
 
-#### Reentrega
+ou de uma reentrega:
 
-```text
 pendencia_id != null
-```
 
-A presença de `saida_id` permite identificar em qual carrada o produto retornou.
+saida_id permite identificar em qual carrada a ocorrência foi registrada.
 
----
-
-# 11. Cálculos derivados do modelo
-
-## 11.1 Total entregue
-
-```text
-SUM(tentativa_items.quantidade_entregue)
-+
-quantidades efetivamente entregues nas reentregas
-```
-
-A implementação deve evitar contar a mesma quantidade duas vezes.
-
----
-
-## 11.2 Total devolvido
-
-```text
-SUM(devolucoes.quantidade)
-```
-
-por `entrega_item_id`.
-
----
-
-## 11.3 Saldo logístico
-
-```text
-saldo logístico =
-quantidade_solicitada
-- quantidade_entregue
-- quantidade_devolvida
-```
-
----
-
-## 11.4 Saldo pendente
-
-```text
-SUM(
-    pendencias.quantidade_original
-    - pendencias.quantidade_resolvida
-)
-```
-
-considerando pendências em estados ativos.
-
----
-
-## 11.5 Saldo normal disponível
-
-Conceitualmente:
-
-```text
-solicitado
-- entregue
-- devolvido
-- pendências ativas
-- reservas em carradas ainda sem retorno
-```
-
----
-
-# 12. Histórico
-
-## 12.1 `entrega_eventos`
-
-Registra eventos associados à entrega.
-
-É utilizado para preservar rastreabilidade do pedido.
-
----
-
-## 12.2 `saida_eventos`
-
-Registra eventos associados à carrada.
-
-É a fonte principal para a linha do tempo operacional da viagem.
-
----
-
-## 12.3 Snapshots históricos
-
-Algumas informações não devem depender exclusivamente do estado atual de outros cadastros.
+18.3 Devolução não altera o pedido original
 
 Exemplo:
 
-```text
+Solicitado: 50
+Entregue:   45
+Devolvido:   5
+
+Continua:
+
+quantidade_solicitada = 50
+
+A devolução é uma entidade separada.
+
+19. Histórico da entrega
+
+19.1 entrega_eventos
+
+Registra eventos associados à entrega.
+
+Exemplos:
+
+ENTREGA_CRIADA
+ENTREGA_ATUALIZADA
+ENTREGA_CANCELADA
+RESULTADO_ENTREGA_REGISTRADO
+
+Campos conceituais:
+
+id;
+
+entrega_id;
+
+usuario_id;
+
+tipo_evento;
+
+descricao;
+
+dados;
+
+created_at.
+
+Eventos complementam o histórico estruturado.
+
+Eles não substituem:
+
+tentativas;
+
+pendências;
+
+devoluções.
+
+20. Ocorrências operacionais
+
+20.1 ocorrencias_operacionais
+
+Entidade destinada a registrar situações excepcionais da operação.
+
+Exemplos de uso:
+
+veículo quebrado;
+
+motorista ausente;
+
+mudança operacional;
+
+problema durante execução;
+
+ocorrência que precise ficar registrada.
+
+Esse módulo ainda pode evoluir funcionalmente.
+
+A existência da entidade permite que futuras telas sejam adicionadas sem misturar ocorrências com eventos comuns de entrega/carrada.
+
+21. Cálculos derivados do modelo
+
+21.1 Total entregue
+
+Conceitualmente:
+
+total entregue
+=
+entregas normais efetivamente entregues
++
+reentregas efetivamente entregues
+
+As fontes incluem:
+
+tentativa_items
++
+saida_pendencia_retornos
+
+A implementação deve evitar dupla contagem.
+
+21.2 Total devolvido
+
+total devolvido
+=
+SUM(devolucoes.quantidade)
+
+por item/entrega conforme a consulta.
+
+21.3 Saldo logístico
+
+saldo logístico
+=
+quantidade_solicitada
+-
+quantidade_entregue
+-
+quantidade_devolvida
+
+21.4 Saldo pendente
+
+saldo pendente
+=
+SUM(
+    quantidade_original
+    -
+    quantidade_resolvida
+)
+
+considerando pendências ainda ativas.
+
+21.5 Reserva normal
+
+Representa quantidade de entrega normal já programada em carrada ainda não encerrada por retorno.
+
+Fonte principal:
+
+saida_entrega_itens
+
+considerando o estado da carrada e a existência do retorno.
+
+21.6 Saldo normal disponível
+
+Conceitualmente:
+
+disponível normal
+=
+solicitado
+-
+entregue
+-
+devolvido
+-
+pendências ativas
+-
+reservas ativas
+
+Essa é uma das fórmulas mais importantes do sistema.
+
+21.7 Quantidade ainda não enviada
+
+Conceitualmente:
+
+ainda não enviado
+=
+saldo restante
+-
+pendências ativas
+-
+quantidade reservada
+
+respeitando as regras do domínio para evitar valores duplicados ou negativos.
+
+22. Exemplo completo de saldo
+
+Pedido:
+
+100 blocos
+
+Primeira carrada:
+
+programado: 55
+entregue:   50
+reentrega:   5
+
+Situação:
+
+Solicitado:        100
+Entregue:           50
+Devolvido:           0
+Saldo restante:     50
+Pendência:            5
+Em carrada:           0
+Ainda não enviado:   45
+
+A conta incorreta seria:
+
+100 - 50 - 5 = 45 de saldo restante
+
+Isso estaria errado porque a pendência já está dentro do saldo de 50.
+
+O correto é:
+
+saldo restante = 100 - 50 = 50
+
+e dentro do saldo:
+
+5  = pendência
+45 = ainda não enviado
+
+23. Estados principais do domínio
+
+23.1 Entrega
+
+PENDENTE
+PROGRAMADA
+EM_SAIDA
+PARCIAL
+CONCLUIDA
+NAO_ENTREGUE
+CANCELADA
+
+23.2 Carrada
+
+PLANEJADA
+EM_ANDAMENTO
+FINALIZADA
+CANCELADA
+
+23.3 Pendência
+
+ABERTA
+PROGRAMADA
+RESOLVIDA
+CANCELADA
+
+23.4 Resultado de tentativa
+
+COMPLETA
+PARCIAL
+NAO_ENTREGUE
+
+23.5 Perfil de usuário
+
+ADMIN
+OPERADOR
+
+24. Snapshots históricos
+
+Algumas informações precisam continuar representando o passado mesmo quando o cadastro atual mudar.
+
+Exemplos:
+
+entregas.cliente_nome
+entregas.cliente_apelido
+entregas.cliente_telefone
+entregas.endereco
+entregas.referencia
 saidas.rota
-```
 
-preserva a rota utilizada no momento da carrada.
+Princípio:
 
-Da mesma forma, eventos podem armazenar dados relevantes em JSON para registrar o contexto daquela operação.
+cadastro atual
+não deve reescrever
+fato histórico
 
----
+25. Eventos x entidades operacionais
 
-# 13. Outras entidades do projeto
+Eventos e entidades estruturadas possuem funções diferentes.
 
-## 13.1 `ocorrencias_operacionais`
+Evento
 
-Prevista/utilizada para registrar situações operacionais excepcionais, como:
+Responde:
 
-- veículo quebrado;
-- motorista ausente;
-- mudança operacional;
-- problema durante a execução.
+o que aconteceu?
+quando?
+quem fez?
 
-A evolução dessa entidade deve ser documentada quando o módulo de ocorrências for trabalhado no frontend.
+Entidade operacional
 
----
+Responde:
 
-## 13.2 `documento_importados`
+qual é o estado atual?
+qual quantidade entra no cálculo?
+qual relacionamento existe?
 
-Entidade relacionada à futura entrada de documentos externos.
+Exemplo:
 
-O objetivo futuro é permitir trabalhar com:
+RESULTADO_ENTREGA_REGISTRADO
 
-- imagem;
-- PDF;
-- planilhas;
-- OCR;
-- conferência antes de gerar entrega.
+pode existir em saida_eventos.
 
-Esse módulo ainda não representa o fluxo principal atual.
+Mas as quantidades reais precisam continuar presentes em:
 
----
+tentativa_entregas
+tentativa_items
+devolucoes
+pendencias
 
-# 14. Relação entre entrega normal, pendência e devolução
+26. Relação entre entrega normal, pendência e devolução
 
-```mermaid
 flowchart TD
     A[entrega_items] --> B[saida_entrega_itens]
     B --> C[tentativa_items]
 
-    C --> D{Quantidade não entregue?}
+    C --> D{Faltou quantidade carregada?}
 
-    D -->|Não| E[Fluxo encerrado]
+    D -->|Não| E[Quantidade entregue]
     D -->|Sim + REENTREGA| F[pendencias]
     D -->|Sim + DEVOLVIDO| G[devolucoes]
 
@@ -913,108 +1658,217 @@ flowchart TD
     H --> I[saida_pendencia_retornos]
 
     I --> J{Restou quantidade?}
-    J -->|Não| K[Pendência resolvida]
+    J -->|Não| K[Pendência RESOLVIDA]
     J -->|Sim + REENTREGA| F
     J -->|Sim + DEVOLVIDO| G
-```
 
----
+27. Relação da importação com a entrega
 
-# 15. Regras estruturais importantes
+flowchart LR
+    A[documento_importados] --> B[texto_extraido]
+    B --> C[dados_extraidos]
+    C --> D[conferência do usuário]
+    D --> E[entregas]
+    E --> F[entrega_items]
 
-## 15.1 Não duplicar obrigação logística
+O documento mantém a origem.
 
-Uma mesma unidade não pode estar simultaneamente:
+A entrega mantém os dados operacionais definitivos.
 
-- disponível como saldo normal;
-- pendente para reentrega;
-- reservada em duas carradas;
-- devolvida e ainda aguardando entrega.
+28. Relação entre autenticação e auditoria
 
----
+flowchart TD
+    A[users] --> B[criado_por]
+    A --> C[registrado_por]
+    A --> D[usuario_id]
 
-## 15.2 Pendência não substitui o item original
+    B --> E[entregas / saidas]
+    C --> F[devoluções / retornos]
+    D --> G[eventos / movimentações]
 
-`pendencias` referencia `entrega_items`.
+O sistema deve preservar o responsável quando a ação possuir importância operacional ou administrativa.
 
-Ela não cria um novo produto.
+29. Integridade transacional
 
-Ela representa uma obrigação logística sobre uma quantidade daquele produto.
-
----
-
-## 15.3 Devolução não altera a quantidade originalmente comprada
-
-A quantidade solicitada deve continuar representando o pedido original.
+Operações que alteram múltiplas tabelas devem ocorrer dentro de transações quando necessário.
 
 Exemplo:
 
-```text
-Comprado: 50
-Entregue: 45
-Devolvido: 5
-```
+registrar retorno
 
-Não alterar:
+pode afetar:
 
-```text
-quantidade_solicitada = 50
-```
+tentativa_entregas
+tentativa_items
+pendencias
+pendencia_movimentacoes
+devolucoes
+entregas
+entrega_eventos
+saida_eventos
+
+Princípio:
+
+ou a operação inteira é persistida
+ou nenhuma parte fica gravada
+
+30. Regras estruturais importantes
+
+30.1 Não duplicar obrigação logística
+
+Uma mesma unidade não pode estar simultaneamente:
+
+disponível como saldo normal;
+
+pendente para reentrega;
+
+reservada em mais de uma carrada;
+
+devolvida e ainda aguardando entrega;
+
+entregue e ainda disponível.
+
+30.2 Pendência não substitui o item original
+
+pendencias referencia entrega_items.
+
+Ela não cria um novo produto.
+
+30.3 Devolução não reduz a quantidade solicitada original
+
+O pedido original deve continuar preservado.
 
 A devolução é registrada separadamente.
 
----
-
-## 15.4 Histórico não deve ser apagado
+30.4 Histórico não deve ser apagado ao resolver uma pendência
 
 Ao resolver uma pendência, não excluir:
 
-- a pendência;
-- suas movimentações;
-- a associação histórica com carradas;
-- retornos registrados;
-- devoluções.
+pendência;
 
-O status deve representar seu estado atual, enquanto as demais tabelas preservam o histórico.
+movimentações;
 
----
+associações históricas;
 
-# 16. Resumo dos relacionamentos principais
+retornos;
 
-```text
+devoluções.
+
+O status representa o estado atual.
+
+As demais tabelas preservam como ele chegou ali.
+
+30.5 Registros operacionais devem preferir cancelamento/inativação
+
+Quando o dado participa de histórico, preferir:
+
+ativo = false;
+
+estado CANCELADA;
+
+resolução;
+
+evento;
+
+em vez de remoção física destrutiva.
+
+30.6 Paginação e ordenação pertencem à consulta
+
+A ordenação de entregas por created_at deve ser realizada antes da paginação.
+
+Exemplo:
+
+ORDER BY created_at ASC
+→ mais antigas primeiro
+
+ORDER BY created_at DESC
+→ mais recentes primeiro
+
+Ordenar apenas os registros recebidos no frontend não representa corretamente o conjunto inteiro.
+
+31. Índices e constraints
+
+O banco deve utilizar constraints para proteger regras estruturais quando apropriado.
+
+Exemplos conhecidos/importantes:
+
+users.email
+→ único
+
+saida_entrega_itens
+→ unicidade de item dentro da associação da carrada
+
+saida_pendencia_retornos
+→ unicidade por saída + pendência
+
+Foreign keys devem ser utilizadas para preservar relacionamentos sempre que o domínio exigir.
+
+32. Datas e timestamps
+
+O banco utiliza timestamps para rastreabilidade.
+
+Campos com função importante incluem:
+
+entregas.created_at
+pendencias.data_abertura
+pendencias.data_resolucao
+tentativa_entregas.data_hora
+devolucoes.data_hora
+saida_pendencia_retornos.data_hora
+eventos.created_at
+
+A aplicação diferencia:
+
+armazenamento
+e
+horário operacional
+
+O fuso operacional atual é:
+
+America/Fortaleza
+
+Consultas por período devem respeitar essa configuração.
+
+33. Resumo dos relacionamentos principais
+
+User
+├── cria Entregas
+├── cria Carradas
+├── importa Documentos
+├── registra Movimentações
+├── registra Devoluções
+└── aparece em Eventos
+
+Documento importado
+└── pode originar Entrega
+
 Cliente
-  └── Entregas
-       ├── Itens
-       │    ├── Programações em carradas
-       │    ├── Resultados por tentativa
-       │    ├── Pendências
-       │    └── Devoluções
-       │
-       ├── Tentativas
-       ├── Eventos
-       └── Pendências
+└── Entregas
+     ├── Itens
+     │    ├── Programações em carradas
+     │    ├── Resultados de tentativa
+     │    ├── Pendências
+     │    └── Devoluções
+     │
+     ├── Tentativas
+     ├── Eventos
+     └── Pendências
 
 Carrada
-  ├── Entregas normais
-  │    └── Itens programados
-  │
-  ├── Pendências / reentregas
-  │    └── Retornos de reentrega
-  │
-  ├── Devoluções
-  ├── Equipe
-  ├── Veículo
-  ├── Rota
-  └── Eventos
-```
+├── Rota
+├── Veículo
+├── Equipe
+├── Entregas normais
+│    └── Itens programados
+├── Pendências / reentregas
+│    └── Retornos
+├── Devoluções
+└── Eventos
 
----
+34. Tabelas centrais do sistema atual
 
-# 17. Entidades que formam o núcleo atual
+Para compreender o núcleo logístico, as tabelas mais importantes são:
 
-As entidades mais importantes para compreender o funcionamento do sistema hoje são:
-
-```text
 entregas
 entrega_items
 
@@ -1032,22 +1886,95 @@ saida_pendencia_retornos
 
 devolucoes
 
-saida_eventos
 entrega_eventos
-```
+saida_eventos
 
-Essas tabelas representam o ciclo:
+Para compreender o sistema completo atual, acrescentar:
 
-```text
-PEDIDO
-  ↓
-PLANEJAMENTO
-  ↓
-CARRADA
-  ↓
-RETORNO
-  ↓
-ENTREGUE / REENTREGA / DEVOLVIDO
-  ↓
-HISTÓRICO
-```
+users
+clientes
+regiaos
+funcionarios
+veiculos
+documento_importados
+ocorrencias_operacionais
+
+35. Ciclo representado pelo modelo
+
+DOCUMENTO / CADASTRO MANUAL
+          ↓
+        ENTREGA
+          ↓
+         ITENS
+          ↓
+     PLANEJAMENTO
+          ↓
+        CARRADA
+          ↓
+        RETORNO
+          ↓
+   ┌──────┼─────────┐
+   ↓      ↓         ↓
+ENTREGUE REENTREGA DEVOLVIDO
+          ↓
+      PENDÊNCIA
+          ↓
+     NOVA CARRADA
+          ↓
+       RETORNO
+          ↓
+      RESOLUÇÃO
+          ↓
+       HISTÓRICO
+
+36. Evolução futura do modelo
+
+O modelo atual já suporta o núcleo operacional construído.
+
+Evoluções futuras podem exigir novas entidades ou extensão das atuais para:
+
+ocorrências operacionais completas;
+
+custos por viagem;
+
+custos de reentrega;
+
+capacidade de veículo;
+
+peso e volume de cargas;
+
+otimização de rota;
+
+integração com ERP;
+
+integrações externas;
+
+planejamento automático;
+
+módulos mobile.
+
+Essas extensões não devem quebrar o histórico existente.
+
+37. Regra de manutenção deste documento
+
+Quando uma migration estrutural for criada ou alterada, verificar impacto em:
+
+Models;
+
+relacionamentos;
+
+Enums;
+
+Services;
+
+Resources;
+
+Types TypeScript;
+
+endpoints;
+
+testes;
+
+docs/banco/modelo_entidades.md.
+
+O banco de dados é parte da arquitetura do produto e sua documentação deve permanecer alinhada ao código.

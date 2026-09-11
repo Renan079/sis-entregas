@@ -32,6 +32,7 @@ async function sair() {
           <span>▦</span>
           Dashboard
         </RouterLink>
+
         <RouterLink to="/clientes">
           <span>♙</span>
           Clientes
@@ -40,6 +41,14 @@ async function sair() {
         <RouterLink to="/regioes">
           <span>⌖</span>
           Regiões
+        </RouterLink>
+
+        <RouterLink
+          v-if="auth.user?.perfil === 'ADMIN'"
+          to="/usuarios"
+        >
+          <span>+</span>
+          Usuários
         </RouterLink>
 
         <RouterLink to="/entregas">

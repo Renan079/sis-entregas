@@ -106,6 +106,7 @@ export interface EntregaFiltros {
   regiao_id?: number | null
   status?: StatusEntrega | ''
   prioridade?: PrioridadeEntrega | ''
+  ordem?: 'antigas' | 'recentes'
   page?: number
 }
 
@@ -119,6 +120,7 @@ export const entregaService = {
           regiao_id: filtros.regiao_id || undefined,
           status: filtros.status || undefined,
           prioridade: filtros.prioridade || undefined,
+          ordem: filtros.ordem || 'antigas',
           page: filtros.page ?? 1,
         },
       },

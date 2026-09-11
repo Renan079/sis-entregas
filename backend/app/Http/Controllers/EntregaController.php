@@ -19,7 +19,7 @@ class EntregaController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $entregas = Entrega::query()
+        $query = Entrega::query()
             ->with([
                 'cliente',
                 'regiao',
@@ -61,10 +61,28 @@ class EntregaController extends Controller
                     'prioridade',
                     $request->string('prioridade')->toString()
                 )
-            )
+            );
 
-            ->latest()
-            ->paginate(20);
+        /*
+         * A tela de entregas é operacional.
+         * Por padrão mostramos primeiro as entregas lançadas há mais tempo,
+         * facilitando identificar os pedidos que estão aguardando há mais dias.
+         *
+         * O frontend pode enviar ordem=recentes para inverter a ordenação.
+         */
+        $ordem = $request->string('ordem')->toString();
+
+        if ($ordem === 'recentes') {
+            $query
+                ->orderByDesc('created_at')
+                ->orderByDesc('id');
+        } else {
+            $query
+                ->orderBy('created_at')
+                ->orderBy('id');
+        }
+
+        $entregas = $query->paginate(20);
 
         return EntregaResource::collection($entregas);
     }

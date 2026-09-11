@@ -1,25 +1,36 @@
 <?php
 
-use App\Http\Controllers\RegiaoController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ClienteController;
-use App\Http\Controllers\EntregaController;
-use App\Http\Controllers\SaidaController;
-use App\Http\Controllers\VeiculoController;
-use App\Http\Controllers\EntregaHistoricoController;
-use App\Http\Controllers\SaidaHistoricoController;
-use App\Http\Controllers\PendenciaController;
 use App\Http\Controllers\ClienteHistoricoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentoImportacaoController;
+use App\Http\Controllers\EntregaController;
+use App\Http\Controllers\EntregaHistoricoController;
+use App\Http\Controllers\PendenciaController;
+use App\Http\Controllers\RegiaoController;
 use App\Http\Controllers\RelatorioController;
+use App\Http\Controllers\SaidaController;
+use App\Http\Controllers\SaidaHistoricoController;
+use App\Http\Controllers\UsuarioController;
+use App\Http\Controllers\VeiculoController;
+use App\Http\Middleware\EnsureUserIsActive;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function () {
 
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
+
+    Route::get('/usuarios', [UsuarioController::class, 'index']);
+
+    Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update']);
+
+    Route::put('/usuarios/{usuario}/senha', [
+        UsuarioController::class,
+        'updatePassword',
+    ]);
 
     Route::apiResource('regioes', RegiaoController::class)
         ->parameters([
@@ -27,15 +38,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
 
     Route::apiResource('clientes', ClienteController::class)
-    ->parameters([
-        'clientes' => 'cliente',
-    ]);
+        ->parameters([
+            'clientes' => 'cliente',
+        ]);
 
     Route::apiResource('entregas', EntregaController::class)
         ->parameters([
             'entregas' => 'entrega',
         ]);
-
 
     Route::get('/pendencias', [
         PendenciaController::class,
@@ -53,7 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/saidas', [
         SaidaController::class,
         'index',
-        ]);
+    ]);
 
     Route::post('/saidas', [
         SaidaController::class,
@@ -125,13 +135,14 @@ Route::middleware('auth:sanctum')->group(function () {
         SaidaController::class,
         'cancelar',
     ]);
+
     Route::apiResource(
         'veiculos',
         VeiculoController::class
     )
         ->parameters([
             'veiculos' => 'veiculo',
-    ]);
+        ]);
 
     Route::get(
         '/planejamento/entregas/{entrega}/itens-disponiveis',
@@ -183,5 +194,4 @@ Route::middleware('auth:sanctum')->group(function () {
         '/relatorios',
         [RelatorioController::class, 'index']
     );
-
 });

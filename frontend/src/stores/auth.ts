@@ -10,27 +10,50 @@ interface User {
   ativo: boolean
 }
 
+interface NovoUsuario {
+  name: string
+  email: string
+  password: string
+  password_confirmation: string
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
+  const creatingUser = ref(false)
 
   async function login(email: string, password: string) {
     loading.value = true
 
     try {
-      // 1. Obtém o cookie CSRF
       await api.get('/sanctum/csrf-cookie')
 
-      // 2. Faz login
       await api.post('/login', {
-        email,
+        email: email.trim().toLowerCase(),
         password,
       })
 
-      // 3. Busca usuário autenticado
       await fetchUser()
     } finally {
       loading.value = false
+    }
+  }
+
+  async function createUser(data: NovoUsuario) {
+    creatingUser.value = true
+
+    try {
+      await api.get('/sanctum/csrf-cookie')
+
+      const response = await api.post('/register', {
+        ...data,
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+      })
+
+      return response.data.user as User
+    } finally {
+      creatingUser.value = false
     }
   }
 
@@ -57,7 +80,9 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     user,
     loading,
+    creatingUser,
     login,
+    createUser,
     logout,
     fetchUser,
   }

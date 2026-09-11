@@ -1,492 +1,994 @@
-# Arquitetura do Sistema
+Arquitetura do Sistema
 
-## 1. Objetivo
+1. Objetivo
 
 Este documento descreve a arquitetura técnica atual do Sistema de Gerenciamento de Entregas.
 
-O objetivo é deixar claro:
+O objetivo é registrar:
 
-- quais tecnologias são utilizadas;
-- como backend, frontend e banco de dados se relacionam;
-- qual responsabilidade pertence a cada camada;
-- onde devem ficar regras de negócio;
-- como o fluxo de uma operação percorre o sistema;
-- quais decisões arquiteturais devem ser preservadas nas próximas evoluções.
+tecnologias utilizadas;
 
----
+relação entre frontend, backend e banco;
 
-# 2. Stack atual
+responsabilidades de cada camada;
 
-## Backend
+organização dos módulos;
 
-- PHP 8.2+
-- Laravel 12
-- Laravel Sanctum
-- Eloquent ORM
-- Form Requests
-- API Resources
-- Services
-- PostgreSQL
+localização das regras de negócio;
 
-## Frontend
+autenticação e autorização;
 
-- Vue 3
-- TypeScript
-- Vite
-- Pinia
-- Vue Router
-- Axios
+processamento de documentos e OCR;
 
-## Infraestrutura
+padrões de histórico e rastreabilidade;
 
-- Docker
-- PostgreSQL 17
-- ambiente local Linux
+convenções que devem ser preservadas durante a evolução do projeto.
 
-## Portas utilizadas no ambiente atual
+A arquitetura deve continuar priorizando:
 
-```text
-Frontend:   http://localhost:5173
+separação de responsabilidades;
+
+integridade dos dados;
+
+segurança;
+
+rastreabilidade;
+
+manutenibilidade;
+
+clareza do domínio.
+
+2. Stack atual
+
+2.1 Backend
+
+PHP 8.2+
+
+Laravel 12
+
+Laravel Sanctum
+
+Eloquent ORM
+
+Form Requests
+
+API Resources
+
+Services
+
+Enums PHP
+
+PostgreSQL
+
+2.2 Frontend
+
+Vue 3
+
+TypeScript
+
+Vite
+
+Pinia
+
+Vue Router
+
+Axios
+
+Vitest
+
+2.3 Infraestrutura
+
+Docker
+
+PostgreSQL 17
+
+ambiente local Linux
+
+frontend e backend executados separadamente durante o desenvolvimento
+
+2.4 Ferramentas auxiliares de importação
+
+O módulo de importação utiliza processamento local para leitura de documentos.
+
+Componentes utilizados no fluxo atual incluem:
+
+Tesseract OCR;
+
+Poppler;
+
+ImageMagick.
+
+Esses componentes auxiliam na transformação de:
+
+imagem / PDF
+    ↓
+texto
+    ↓
+dados estruturados
+    ↓
+prévia editável
+
+3. Ambiente local atual
+
+Configuração utilizada no ambiente de desenvolvimento:
+
+Frontend:   http://127.0.0.1:5173
 Backend:    http://127.0.0.1:8001
 PostgreSQL: 127.0.0.1:5433
-```
 
----
+O PostgreSQL executa em container Docker.
 
-# 3. Visão geral da arquitetura
+A porta externa utilizada atualmente é 5433.
 
-```mermaid
+4. Visão geral da arquitetura
+
 flowchart LR
-    U[Usuário] --> V[Vue 3]
-    V --> S[Services TypeScript]
-    S --> A[Axios]
-    A --> API[Laravel API]
+    U[Usuário] --> FE[Vue 3 + TypeScript]
 
-    API --> C[Controllers]
-    C --> R[Form Requests]
+    FE --> RT[Vue Router]
+    FE --> ST[Pinia]
+    FE --> SV[Services HTTP]
+
+    SV --> AX[Axios]
+    AX --> SAN[Laravel Sanctum]
+    SAN --> API[Laravel]
+
+    API --> MW[Middleware]
+    MW --> C[Controllers]
+
+    C --> FR[Form Requests]
     C --> BS[Services de negócio]
+    C --> RS[API Resources / JSON]
+
     BS --> M[Eloquent Models]
+    BS --> EV[Eventos / Históricos]
     M --> DB[(PostgreSQL)]
-
-    BS --> EV[Eventos / Histórico]
     EV --> DB
-```
 
-A aplicação segue uma separação entre:
+    API --> OCR[Serviços de importação / OCR]
+    OCR --> DB
 
-```text
+Fluxo conceitual principal:
+
 Interface
-    ↓
-Comunicação HTTP
-    ↓
+   ↓
+Router / Store
+   ↓
+Service HTTP
+   ↓
+Axios
+   ↓
+Laravel
+   ↓
+Middleware / autenticação
+   ↓
 Controller
-    ↓
-Regra de negócio
-    ↓
-Persistência
-```
+   ↓
+Form Request
+   ↓
+Service de negócio
+   ↓
+Models / banco
+   ↓
+Resource / JSON
+   ↓
+Frontend
 
----
+5. Princípio de separação de responsabilidades
 
-# 4. Responsabilidade de cada camada
+Cada camada deve possuir uma responsabilidade principal.
 
-## 4.1 Frontend
+Frontend
+→ experiência e apresentação
+
+Service HTTP
+→ comunicação com API
+
+Controller
+→ orquestração HTTP
+
+Form Request
+→ validação de entrada
+
+Service de negócio
+→ regras e coordenação do domínio
+
+Model
+→ entidade e persistência
+
+Resource
+→ contrato de saída
+
+Banco
+→ estado persistido oficial
+
+Uma regra crítica não deve existir somente no frontend.
+
+6. Arquitetura do frontend
+
+6.1 Responsabilidades
 
 O frontend é responsável por:
 
-- apresentar dados;
-- coletar informações do operador;
-- fazer validações de experiência de uso;
-- chamar a API;
-- atualizar a interface após operações;
-- manter estado temporário da tela.
+apresentar informações;
 
-O frontend **não deve ser a fonte oficial das regras de negócio**.
+coletar dados do usuário;
 
-Exemplo:
+fornecer feedback visual;
 
-A tela pode impedir visualmente:
+executar validações de experiência;
 
-```text
-entregue > carregado
-```
+navegar entre telas;
 
-mas o backend também deve validar essa regra.
+manter estado temporário;
 
----
+chamar serviços HTTP;
 
-## 4.2 Services do frontend
+refletir os resultados retornados pelo backend.
 
-Arquivos de `services` centralizam chamadas HTTP.
-
-Exemplo atual:
-
-```text
-frontend/src/services/saidaService.ts
-```
-
-Responsabilidades:
-
-- definir URL;
-- definir método HTTP;
-- tipar request e response;
-- devolver ao componente apenas os dados necessários.
-
-Exemplo conceitual:
-
-```ts
-saidaService.registrarResultadoEntrega(...)
-```
-
-A página Vue não precisa conhecer detalhes do Axios para cada chamada.
-
----
-
-## 4.3 Types do frontend
-
-Os tipos TypeScript representam os contratos utilizados pela interface.
+O frontend não é a fonte oficial das regras críticas.
 
 Exemplo:
 
-```text
-frontend/src/types/Saida.ts
-```
+entregue <= carregado
 
-Esse arquivo contém conceitos como:
+A interface pode impedir visualmente uma quantidade inválida, mas o backend deve validar novamente.
 
-- `Saida`;
-- `SaidaEntrega`;
-- `SaidaItemProgramado`;
-- `ItemRetornoCarrada`;
-- `DestinoNaoEntregue`;
-- `MotivoDevolucao`.
+7. Organização atual do frontend
 
-### Regra arquitetural
+A organização evoluiu para uma estrutura por domínio.
 
-Quando a API mudar de forma relevante, verificar também os tipos TypeScript.
+Referência atual:
 
----
-
-# 5. Organização do frontend
-
-A estrutura pode crescer por módulos.
-
-No módulo de saídas atualmente utilizado pela aplicação:
-
-```text
 frontend/
 └── src/
+    ├── components/
+    │   ├── Clientes/
+    │   ├── Dashboard/
+    │   ├── Entregas/
+    │   ├── Pendencias/
+    │   ├── Regioes/
+    │   ├── Saidas/
+    │   └── Usuarios/
+    │
     ├── pages/
-    │   └── Saidas/
-    │       └── SaidasView.vue
+    │   ├── Clientes/
+    │   ├── Dashboard/
+    │   ├── Entregas/
+    │   ├── Pendencias/
+    │   ├── Regioes/
+    │   ├── Saidas/
+    │   └── Usuarios/
     │
     ├── services/
-    │   ├── api.ts
-    │   └── saidaService.ts
-    │
-    ├── types/
-    │   └── Saida.ts
-    │
+    ├── stores/
     ├── router/
-    └── stores/
-```
+    ├── styles/
+    │   └── pages/
+    ├── types/
+    └── main.ts
 
-> A localização de outras páginas pode variar conforme a evolução do frontend, mas o princípio deve ser manter páginas, serviços e tipos separados.
+A estrutura pode crescer, mas o princípio deve ser preservado:
 
----
+página
+≠ componente reutilizável
+≠ service HTTP
+≠ type
+≠ store
+≠ CSS
 
-# 6. Página `SaidasView.vue`
+8. Páginas e componentes
 
-A tela de saídas é atualmente um dos módulos mais importantes do sistema.
+8.1 Regra de composição
 
-Ela concentra fluxos como:
+Páginas devem funcionar principalmente como orquestradoras.
 
-- listar carradas;
-- criar carrada;
-- definir rota;
-- abrir carrada;
-- buscar entregas disponíveis;
-- selecionar produtos;
-- adicionar entrega;
-- visualizar reentregas;
-- adicionar pendência;
-- iniciar carrada;
-- registrar retorno;
-- registrar retorno de reentrega;
-- visualizar histórico.
+Elas podem:
 
-### Evolução futura recomendada
+carregar dados;
 
-Conforme a tela crescer, componentes podem ser extraídos.
+controlar estado da tela;
 
-Exemplo:
+chamar services;
 
-```text
-pages/Saidas/
+abrir ou fechar componentes;
+
+navegar entre rotas.
+
+Componentes devem encapsular partes menores da interface.
+
+8.2 Refatoração aplicada
+
+Telas que cresceram demais foram divididas.
+
+Exemplo do módulo de saídas:
+
+src/pages/Saidas/
 ├── SaidasView.vue
-└── components/
-    ├── CarradaModal.vue
-    ├── RotaCarrada.vue
-    ├── EntregasDisponiveis.vue
-    ├── ReentregasDisponiveis.vue
-    ├── RetornoEntregaModal.vue
-    ├── RetornoReentregaModal.vue
-    └── HistoricoCarradaModal.vue
-```
+├── SaidaNovaView.vue
+├── SaidaDetalheView.vue
+└── SaidaHistoricoView.vue
 
-A extração deve acontecer quando melhorar legibilidade e manutenção, sem criar abstrações desnecessárias.
+Componentes relacionados:
 
----
+src/components/Saidas/
+├── CarradaDetalhesPainel.vue
+├── HistoricoCarradaPainel.vue
+├── RetornoEntregaModal.vue
+├── RetornoPendenciaModal.vue
+└── SelecionarItensModal.vue
 
-# 7. Camada HTTP do backend
+8.3 Entregas
 
-## 7.1 Rotas
+Estrutura adotada:
 
-As rotas da API ficam em:
+src/pages/Entregas/
+├── EntregasView.vue
+├── EntregaFormularioView.vue
+└── EntregaHistoricoView.vue
 
-```text
-backend/routes/api.php
-```
+Componentes:
 
-As rotas operacionais estão protegidas por:
+src/components/Entregas/
+├── EntregaHistoricoPainel.vue
+└── ImportarEntregaModal.vue
 
-```php
-Route::middleware('auth:sanctum')
-```
+8.4 Clientes
 
-Isso significa que o backend é a autoridade final para acesso às operações.
+Estrutura atual:
 
----
+src/pages/Clientes/
+├── ClientesView.vue
+└── ClienteHistoricoView.vue
 
-## 7.2 Controllers
+Componentes:
 
-Controllers recebem a requisição HTTP e encaminham a operação para a camada adequada.
+src/components/Clientes/
+├── ClienteFormularioModal.vue
+└── ClienteHistoricoPainel.vue
+
+8.5 Regiões
+
+Estrutura atual:
+
+src/pages/Regioes/
+└── RegioesView.vue
+
+src/components/Regioes/
+└── RegiaoFormularioModal.vue
+
+8.6 Dashboard
+
+A Dashboard também foi dividida em componentes menores.
+
+Referência:
+
+src/pages/Dashboard/
+└── DashboardView.vue
+
+Componentes:
+
+src/components/Dashboard/
+├── DashboardMetricas.vue
+├── DashboardRegioesPainel.vue
+├── DashboardCarradasPainel.vue
+├── DashboardPendenciasPainel.vue
+└── DashboardEntregasPainel.vue
+
+9. Estilos do frontend
+
+Os estilos específicos foram separados por domínio.
 
 Exemplos:
 
-```text
-SaidaController
+src/styles/pages/saida/
+src/styles/pages/entrega/
+src/styles/pages/cliente/
+src/styles/pages/regiao/
+src/styles/pages/dashboard/
+
+Também existe um design system global:
+
+src/styles/design-system.css
+
+Ele concentra princípios visuais compartilhados.
+
+9.1 Identidade visual
+
+O sistema utiliza atualmente:
+
+azul-marinho na navegação;
+
+azul para ações principais;
+
+laranja como destaque operacional;
+
+branco e cinza claro em superfícies;
+
+verde para sucesso;
+
+vermelho para perigo;
+
+sombras sutis e cartões claros.
+
+Valores aproximados utilizados:
+
+navy:       #0B1F44
+azul:       #155EEF / #2563EB
+laranja:    #F97316
+azul claro: #EFF6FF
+laranja claro: #FFF7ED
+fundo:      #F5F7FB
+
+A intenção é manter consistência entre módulos.
+
+10. Services HTTP do frontend
+
+Arquivos de services centralizam comunicação com a API.
+
+Exemplos:
+
+src/services/api.ts
+src/services/entregaService.ts
+src/services/saidaService.ts
+src/services/clienteService.ts
+src/services/regiaoService.ts
+
+Responsabilidades:
+
+definir endpoint;
+
+definir método HTTP;
+
+enviar parâmetros;
+
+tipar requests;
+
+tipar responses;
+
+retornar ao componente somente os dados necessários.
+
+Exemplo conceitual:
+
+entregaService.listar(...)
+saidaService.registrarResultadoEntrega(...)
+
+A página Vue não deve conhecer detalhes repetitivos do Axios para cada operação.
+
+11. Axios e API base
+
+A instância central de Axios utiliza:
+
+withCredentials: true
+withXSRFToken: true
+
+Isso permite trabalhar com autenticação por sessão e proteção CSRF do Laravel Sanctum.
+
+Arquitetura:
+
+Vue
+ ↓
+api.ts
+ ↓
+Axios
+ ↓
+Cookie de sessão / XSRF
+ ↓
+Laravel
+
+12. Types TypeScript
+
+Os arquivos em src/types representam os contratos consumidos pela interface.
+
+Exemplos:
+
+src/types/Entrega.ts
+src/types/Saida.ts
+src/types/Cliente.ts
+src/types/Regiao.ts
+
+Os tipos devem refletir o contrato real da API.
+
+Regra:
+
+sempre que a resposta HTTP mudar de forma relevante, verificar os types correspondentes.
+
+13. Stores
+
+Pinia é utilizado para estado global quando necessário.
+
+O exemplo mais importante atualmente é autenticação.
+
+src/stores/auth.ts
+
+Responsabilidades atuais:
+
+usuário autenticado;
+
+login;
+
+logout;
+
+carregamento do usuário atual;
+
+criação administrativa de usuário;
+
+estado de carregamento relacionado à autenticação.
+
+Estados de tela muito locais não precisam ser colocados em Pinia.
+
+14. Router
+
+Vue Router controla:
+
+rotas públicas;
+
+rotas autenticadas;
+
+páginas por módulo;
+
+proteção por perfil.
+
+Exemplo conceitual:
+
+/login
+/
+/entregas
+/entregas/nova
+/entregas/:id/editar
+/entregas/:id/historico
+/saidas
+/saidas/nova
+/saidas/:id
+/saidas/:id/historico
+/clientes
+/clientes/:id/historico
+/usuarios
+/usuarios/novo
+
+Rotas administrativas podem utilizar metadados como:
+
+requiresAdmin
+
+A proteção visual do router não substitui autorização no backend.
+
+15. Arquitetura do backend
+
+Estrutura de referência:
+
+backend/
+├── app/
+│   ├── Enums/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   ├── Requests/
+│   │   └── Resources/
+│   ├── Models/
+│   └── Services/
+│
+├── config/
+├── database/
+│   ├── migrations/
+│   ├── factories/
+│   └── seeders/
+│
+├── routes/
+│   ├── api.php
+│   └── web.php
+│
+└── tests/
+    └── Feature/
+
+16. Rotas
+
+16.1 API operacional
+
+Rotas da aplicação ficam principalmente em:
+
+backend/routes/api.php
+
+A maior parte das operações do sistema é protegida por:
+
+Route::middleware('auth:sanctum')
+
+16.2 Rotas de autenticação
+
+O fluxo de sessão utiliza rotas web específicas como:
+
+POST /login
+POST /register
+POST /logout
+
+/register não é cadastro público.
+
+Ele exige usuário autenticado e autorizado como administrador.
+
+17. CORS
+
+Como frontend e backend executam em portas diferentes no desenvolvimento, CORS precisa aceitar explicitamente a origem do frontend.
+
+Configuração atual inclui:
+
+http://127.0.0.1:5173
+http://localhost:5173
+
+Rotas relevantes de sessão também precisam participar da configuração CORS, incluindo:
+
+sanctum/csrf-cookie
+login
+logout
+register
+
+Com credenciais:
+
+supports_credentials = true
+
+18. Laravel Sanctum
+
+A autenticação é baseada em sessão.
+
+Fluxo:
+
+sequenceDiagram
+    participant U as Usuário
+    participant V as Vue
+    participant A as Axios
+    participant S as Sanctum
+    participant L as Laravel
+
+    U->>V: informa e-mail e senha
+    V->>A: GET /sanctum/csrf-cookie
+    A->>S: solicita proteção CSRF
+    S-->>A: cookie XSRF
+    V->>A: POST /login
+    A->>L: credenciais + cookies
+    L-->>A: sessão autenticada
+    V->>A: GET /api/user
+    A->>L: sessão
+    L-->>V: usuário autenticado
+
+19. Autorização
+
+Os perfis atuais são:
+
+ADMIN
+OPERADOR
+
+O backend é a autoridade final.
+
+Exemplo:
+
+Frontend esconde botão
++
+Router bloqueia navegação
++
+Backend valida perfil
+
+A última camada é obrigatória.
+
+20. Controllers
+
+Controllers lidam com a camada HTTP.
+
+Exemplos:
+
+AuthController
 EntregaController
+SaidaController
 ClienteController
 RegiaoController
 VeiculoController
+PendenciaController
+DocumentoImportacaoController
 EntregaHistoricoController
 SaidaHistoricoController
-```
 
-### Controller deve fazer
+Responsabilidades:
 
-- receber request;
-- obter parâmetros da rota;
-- chamar services;
-- carregar relações necessárias;
-- retornar Resource ou JSON.
+receber request;
 
-### Controller não deve concentrar
+receber parâmetros da rota;
 
-- cálculos complexos de saldo;
-- regras de reentrega;
-- atualização de vários estados;
-- lógica extensa de pendências.
+obter usuário autenticado;
 
-Essas responsabilidades pertencem à camada de Services.
+utilizar dados validados;
 
----
+chamar Services;
 
-# 8. Form Requests
+carregar relações necessárias;
 
-Form Requests centralizam validação de entrada.
+retornar Resource ou JSON.
 
-Exemplos atuais:
+Controllers não devem concentrar lógica complexa de domínio.
 
-```text
+21. Form Requests
+
+Form Requests centralizam validações de entrada.
+
+Exemplos do domínio:
+
+StoreEntregaRequest
+UpdateEntregaRequest
 StoreSaidaRequest
 AdicionarEntregaSaidaRequest
 RegistrarResultadoEntregaRequest
 RegistrarResultadoPendenciaRequest
-```
+ImportarDocumentoPreviewRequest
 
-### Exemplo
+O objetivo é permitir que Services recebam dados previamente validados.
 
-O retorno de uma entrega aceita:
+22. API Resources
 
-```text
-itens[].entrega_item_id
-itens[].quantidade_entregue
-itens[].destino_nao_entregue
-itens[].motivo_devolucao
-itens[].observacao
-```
+Resources padronizam respostas HTTP.
 
-Os valores aceitos para destino são:
+Exemplos:
 
-```text
-REENTREGA
-DEVOLVIDO
-```
+EntregaResource
+SaidaResource
 
-### Benefício
+Benefícios:
 
-O Service recebe dados previamente validados e pode focar na regra de negócio.
+controle de campos expostos;
 
----
+normalização de enums;
 
-# 9. Services do backend
+organização de relacionamentos;
 
-A camada de Services contém a maior parte da lógica operacional.
+contrato mais estável;
 
-Estrutura atual relevante:
+redução de dependência direta do frontend sobre Models.
 
-```text
+Fluxo:
+
+Model
+ ↓
+Resource
+ ↓
+JSON
+ ↓
+TypeScript
+
+23. Services do backend
+
+A camada de Services concentra coordenação de regras de negócio.
+
+Estrutura relevante inclui:
+
 backend/app/Services/
 ├── SaidaService.php
 ├── EntregaService.php
 ├── EntregaStatusService.php
 ├── PendenciaService.php
-└── SaidaHistoricoService.php
-```
+├── SaidaHistoricoService.php
+└── DocumentoImportacaoService.php
 
----
+Outros services podem ser adicionados conforme novos módulos exigirem isolamento de responsabilidade.
 
-## 9.1 `SaidaService`
+24. SaidaService
 
-Responsável pelo ciclo operacional da carrada.
+Responsável principalmente por planejamento e ciclo operacional da carrada.
 
-Principais responsabilidades:
+Responsabilidades incluem:
 
-- criar carrada;
-- adicionar entrega;
-- remover entrega;
-- adicionar pendência;
-- remover pendência;
-- iniciar carrada;
-- finalizar carrada;
-- trocar veículo;
-- cancelar carrada;
-- calcular itens disponíveis para programação;
-- controlar saldo normal;
-- sincronizar estado de programação;
-- registrar eventos da carrada.
+criar carrada;
 
-### Regra importante
+adicionar entrega;
 
-O `SaidaService` trabalha principalmente com:
+remover entrega;
 
-> planejamento e estado da carrada.
+programar itens;
 
----
+adicionar pendência;
 
-## 9.2 `EntregaService`
+remover pendência;
 
-Responsável pelo resultado de uma entrega normal.
+iniciar carrada;
 
-Principal operação:
+finalizar carrada;
 
-```text
+cancelar carrada;
+
+controlar disponibilidade;
+
+controlar reservas;
+
+sincronizar estados;
+
+registrar eventos.
+
+Princípio:
+
+SaidaService
+→ planejamento + estado da carrada
+
+25. EntregaService
+
+Responsável principalmente pelo resultado de uma entrega normal.
+
+Operação central:
+
 registrarResultado()
-```
 
-Fluxo resumido:
+Fluxo:
 
-```mermaid
 flowchart TD
-    A[Retorno recebido] --> B[Validar carrada em andamento]
-    B --> C[Validar entrega na carrada]
-    C --> D[Validar quantidades]
-    D --> E[Criar tentativa]
-    E --> F[Criar tentativa_items]
-    F --> G[Tratar Reentrega x Devolvido]
-    G --> H[Sincronizar pendências]
-    H --> I[Atualizar status da entrega]
-    I --> J[Registrar eventos]
-```
+    A[Retorno recebido] --> B[Validar carrada]
+    B --> C[Validar entrega vinculada]
+    C --> D[Validar itens programados]
+    D --> E[Validar quantidades]
+    E --> F[Criar tentativa]
+    F --> G[Criar itens da tentativa]
+    G --> H{Diferença não entregue?}
+    H -->|REENTREGA| I[Sincronizar pendência]
+    H -->|DEVOLVIDO| J[Registrar devolução]
+    I --> K[Sincronizar status]
+    J --> K
+    K --> L[Registrar eventos]
 
----
-
-## 9.3 `PendenciaService`
+26. PendenciaService
 
 Responsável pelas obrigações de reentrega.
 
-Principais responsabilidades:
+Responsabilidades:
 
-- sincronizar pendências geradas por uma entrega;
-- criar pendência;
-- resolver pendência;
-- registrar movimentações;
-- registrar retorno específico de uma reentrega;
-- registrar devolução originada de uma reentrega;
-- decidir se o saldo volta para `ABERTA` ou termina em `RESOLVIDA`.
+criar/sincronizar pendência;
 
-### Regra importante
+atualizar quantidade resolvida;
 
-Pendência e saldo normal são conceitos separados.
+registrar movimentações;
 
----
+adicionar pendência em carrada;
 
-## 9.4 `EntregaStatusService`
+remover pendência;
 
-Centraliza cálculos que determinam o estado logístico da entrega.
+registrar retorno de reentrega;
 
-Responsabilidades atuais:
+registrar devolução originada da reentrega;
 
-- calcular total entregue;
-- calcular total devolvido;
-- sincronizar status da entrega.
+decidir entre ABERTA, PROGRAMADA e RESOLVIDA.
 
-### Razão para existir
+Regra central:
 
-Após a criação de devoluções, a conclusão do pedido não pode depender somente de:
+pendência != saldo normal
 
-```text
-quantidade entregue
-```
+27. EntregaStatusService
 
-Agora é necessário considerar:
+Centraliza cálculo do estado logístico da entrega.
 
-```text
-quantidade tratada =
+Deve considerar:
+
+quantidade solicitada;
+
+quantidade entregue;
+
+quantidade devolvida;
+
+obrigações restantes.
+
+Conceito principal:
+
+quantidade tratada
+=
 quantidade entregue
 +
 quantidade devolvida
-```
 
----
+Conclusão não pode depender somente da quantidade entregue.
 
-## 9.5 `SaidaHistoricoService`
+28. SaidaHistoricoService
 
-Responsável por montar uma representação histórica de uma carrada.
+Monta a representação histórica de uma carrada.
 
-Ele combina informações de:
+Combina dados de:
 
-- saída;
-- rota;
-- entregas normais;
-- tentativas;
-- itens;
-- pendências geradas;
-- reentregas;
-- devoluções;
-- eventos.
+saída;
 
-### Regra importante
+rota;
 
-Carradas contendo somente reentregas também precisam aparecer como operações reais no histórico.
+entregas normais;
 
----
+tentativas;
 
-# 10. Models
+itens;
+
+pendências;
+
+reentregas;
+
+devoluções;
+
+eventos.
+
+Carrada com somente reentrega continua sendo uma operação real e deve aparecer corretamente.
+
+29. DocumentoImportacaoService
+
+Responsável pela etapa técnica de importação de documentos.
+
+Fluxo conceitual:
+
+arquivo
+ ↓
+armazenamento
+ ↓
+extração de texto
+ ↓
+interpretação
+ ↓
+prévia
+ ↓
+confirmação pelo usuário
+ ↓
+entrega
+
+Responsabilidades podem incluir:
+
+receber imagem ou PDF;
+
+armazenar arquivo;
+
+calcular hash;
+
+extrair texto;
+
+processar várias páginas;
+
+gerar dados preliminares;
+
+identificar possíveis duplicidades/sobreposições;
+
+preparar dados para conferência.
+
+O Service de importação não deve considerar o OCR infalível.
+
+30. Pipeline OCR
+
+Visão técnica:
+
+flowchart TD
+    A[Upload] --> B{Tipo}
+    B -->|Imagem| C[Normalização]
+    B -->|PDF| D[Conversão de páginas]
+
+    D --> C
+    C --> E[Tesseract OCR]
+    E --> F[Texto extraído]
+    F --> G[Parser]
+    G --> H[Dados estruturados]
+    H --> I[Prévia editável]
+    I --> J[Confirmação]
+    J --> K[Persistência]
+
+Para múltiplas imagens:
+
+imagem 1
+imagem 2
+imagem 3
+...
+
+a ordem informada deve ser preservada.
+
+31. Models
 
 Models Eloquent representam entidades persistidas.
 
-Principais modelos do núcleo:
+Principais entidades atuais incluem:
 
-```text
+User
+Cliente
+Regiao
+Veiculo
+DocumentoImportado
+
 Entrega
 EntregaItem
+EntregaEvento
 
 Saida
 SaidaEntrega
 SaidaEntregaItem
+SaidaEquipe
+SaidaEvento
 
 TentativaEntrega
 TentativaItem
@@ -495,97 +997,85 @@ Pendencia
 PendenciaMovimentacao
 
 Devolucao
+SaidaPendencia
 SaidaPendenciaRetorno
 
-SaidaEvento
-EntregaEvento
-```
+OcorrenciaOperacional
 
-### Model deve conter
+Nem todo Model precisa possuir Service próprio.
 
-- tabela;
-- fillable;
-- casts;
-- relacionamentos;
-- comportamentos simples diretamente relacionados à entidade.
+A necessidade depende da complexidade da regra.
 
-### Model não deve virar
+32. Responsabilidade dos Models
 
-um grande Service escondido.
+Models devem concentrar principalmente:
 
-Regras que coordenam várias entidades devem continuar nos Services.
+configuração da tabela;
 
----
+fillable;
 
-# 11. Resources
+casts;
 
-Resources padronizam a saída HTTP.
+relacionamentos;
 
-Exemplo:
+scopes simples;
 
-```text
-SaidaResource
-```
+comportamentos diretamente ligados à entidade.
 
-Benefícios:
+Models não devem virar Services escondidos.
 
-- evita retornar Model bruto;
-- controla campos expostos;
-- normaliza enums;
-- organiza relações;
-- mantém formato estável para o frontend.
+Quando uma operação coordena várias entidades, deve preferencialmente ficar em Service.
 
-Fluxo:
+33. PostgreSQL
 
-```text
-Model
-  ↓
-Resource
-  ↓
-JSON
-  ↓
-TypeScript
-```
+PostgreSQL é a fonte oficial do estado persistido.
 
----
+O banco armazena:
 
-# 12. Banco PostgreSQL
+cadastros;
 
-O PostgreSQL é a fonte oficial do estado persistido.
+dados operacionais;
 
-O banco contém:
+histórico;
 
-- dados operacionais atuais;
-- histórico;
-- relacionamentos;
-- snapshots;
-- movimentações.
+snapshots;
 
-### Tipos utilizados
+movimentações;
 
-O projeto utiliza recursos como:
+eventos;
 
-- foreign keys;
-- numeric com 3 casas;
-- enums;
-- JSONB;
-- timestamps;
-- índices;
-- constraints de unicidade.
+documentos importados;
 
----
+autenticação/sessões quando configurado.
 
-# 13. Uso de JSONB
+34. Recursos utilizados no banco
 
-O principal uso atual é:
+O projeto utiliza conceitos como:
 
-```text
-saidas.rota
-```
+foreign keys;
+
+numeric com precisão adequada;
+
+enums/checks;
+
+JSONB;
+
+timestamps;
+
+índices;
+
+constraints;
+
+relacionamentos N;
+
+tabelas de histórico.
+
+35. JSONB
+
+Um uso importante é a rota da carrada.
 
 Exemplo:
 
-```json
 [
   {
     "regiao_id": 1,
@@ -594,90 +1084,141 @@ Exemplo:
   {
     "regiao_id": 2,
     "nome": "Serra de São João"
+  },
+  {
+    "regiao_id": null,
+    "nome": "Banco de Areia"
   }
 ]
-```
 
-### Por que JSONB neste caso
+Nesse caso JSONB funciona como snapshot ordenado.
 
-A rota:
+Vantagens:
 
-- é ordenada;
-- funciona como snapshot histórico;
-- permite parada livre;
-- não precisa ser normalizada como uma entidade operacional complexa neste momento.
+preserva ordem;
 
----
+preserva nome histórico;
 
-# 14. Transações
+aceita parada livre;
 
-Operações que alteram várias tabelas devem utilizar transação.
+evita alteração retroativa quando um cadastro de região muda.
+
+36. Transações
+
+Operações que alteram múltiplas entidades devem utilizar transação.
 
 Exemplos:
 
-- registrar retorno;
-- gerar pendência;
-- registrar devolução;
-- adicionar ou remover reentrega;
-- finalizar operação de pendência.
+criar entrega e itens;
 
-Modelo conceitual:
+registrar retorno;
 
-```php
+criar tentativa e itens;
+
+gerar pendência;
+
+registrar devolução;
+
+adicionar reentrega;
+
+remover reentrega;
+
+finalizar operação de pendência;
+
+sincronizar estados relacionados.
+
+Exemplo:
+
 DB::transaction(function () {
     // alterações relacionadas
 });
-```
 
-### Objetivo
+Objetivo:
 
-Ou a operação inteira acontece, ou nenhuma parte fica gravada.
+tudo acontece
+ou
+nada acontece
 
----
+37. Histórico e rastreabilidade
 
-# 15. Histórico e eventos
+O sistema utiliza diferentes mecanismos complementares.
 
-O sistema possui duas formas complementares de histórico.
-
-## Estado persistido
-
-Exemplos:
-
-- tentativa;
-- pendência;
-- devolução;
-- retorno de reentrega.
-
-Esses registros possuem valor operacional próprio.
-
-## Eventos
+37.1 Estado persistido
 
 Exemplos:
 
-- `SAIDA_CRIADA`;
-- `ENTREGA_ADICIONADA`;
-- `PENDENCIA_ADICIONADA`;
-- `SAIDA_INICIADA`;
-- `RESULTADO_ENTREGA_REGISTRADO`.
+tentativas;
+
+itens de tentativa;
+
+pendências;
+
+devoluções;
+
+retornos de reentrega.
+
+Essas entidades possuem significado próprio para cálculo.
+
+37.2 Eventos
+
+Exemplos:
+
+ENTREGA_CRIADA
+ENTREGA_ATUALIZADA
+ENTREGA_CANCELADA
+
+SAIDA_CRIADA
+ENTREGA_ADICIONADA
+PENDENCIA_ADICIONADA
+SAIDA_INICIADA
+RESULTADO_ENTREGA_REGISTRADO
+SAIDA_FINALIZADA
 
 Eventos ajudam a explicar a sequência da operação.
 
-### Regra
+37.3 Regra arquitetural
 
-Evento não deve substituir uma entidade necessária para cálculo.
+Evento não substitui uma entidade operacional necessária.
 
-Por exemplo:
+Exemplo:
 
-A devolução precisa existir em `devolucoes`, não somente em um JSON de evento.
+devolução
 
----
+precisa existir como registro persistido próprio.
 
-# 16. Fluxo técnico de uma entrega normal
+Não é suficiente guardar apenas:
 
-```mermaid
+{
+  "evento": "produto devolvido"
+}
+
+38. Snapshots
+
+Snapshots são utilizados quando alterações futuras em cadastros não podem modificar a interpretação do passado.
+
+Exemplos:
+
+nome do cliente na entrega;
+
+telefone do cliente na entrega;
+
+endereço;
+
+referência;
+
+rota da carrada.
+
+Princípio:
+
+cadastro atual
+!=
+fato histórico
+
+39. Fluxo técnico de uma entrega normal
+
 sequenceDiagram
     participant U as Usuário
-    participant V as SaidasView
+    participant V as Vue
     participant FS as saidaService.ts
     participant C as SaidaController
     participant ES as EntregaService
@@ -687,33 +1228,33 @@ sequenceDiagram
 
     U->>V: Registra retorno
     V->>FS: registrarResultadoEntrega()
-    FS->>C: POST /resultado
+    FS->>C: POST endpoint de resultado
     C->>ES: registrarResultado()
 
-    ES->>DB: grava tentativa
-    ES->>DB: grava itens
+    ES->>DB: cria tentativa
+    ES->>DB: cria itens da tentativa
 
-    ES->>PS: trata faltas/reentregas
-    PS->>DB: cria/atualiza pendências
+    alt diferença para REENTREGA
+        ES->>PS: sincronizar pendência
+        PS->>DB: cria/atualiza pendência
+    else diferença DEVOLVIDA
+        ES->>DB: registra devolução
+    end
 
-    ES->>DB: grava devoluções
-    ES->>SS: sincroniza status
+    ES->>SS: sincronizar status
     SS->>DB: atualiza entrega
 
-    ES-->>C: tentativa
+    ES->>DB: registra eventos
+    ES-->>C: resultado
     C-->>FS: JSON
-    FS-->>V: resultado
+    FS-->>V: dados atualizados
     V-->>U: interface atualizada
-```
 
----
+40. Fluxo técnico de uma reentrega
 
-# 17. Fluxo técnico de uma reentrega
-
-```mermaid
 sequenceDiagram
     participant U as Usuário
-    participant V as SaidasView
+    participant V as Vue
     participant FS as saidaService.ts
     participant C as SaidaController
     participant PS as PendenciaService
@@ -722,58 +1263,176 @@ sequenceDiagram
 
     U->>V: Registra retorno da reentrega
     V->>FS: registrarResultadoPendencia()
-    FS->>C: POST /pendencias/{id}/resultado
-    C->>PS: registrarRetorno()
+    FS->>C: POST resultado da pendência
+    C->>PS: registrar retorno
 
-    PS->>DB: grava saida_pendencia_retornos
+    PS->>DB: registra retorno
     PS->>DB: atualiza pendência
 
     alt restante devolvido
-        PS->>DB: grava devolução
+        PS->>DB: registra devolução
+    else restante continua
+        PS->>DB: pendência retorna a ABERTA
     end
 
-    PS->>SS: sincroniza pedido
-    SS->>DB: atualiza entrega
+    PS->>SS: sincroniza entrega
+    SS->>DB: atualiza status
 
     PS-->>C: resultado
     C-->>FS: JSON
-    FS-->>V: resultado
-```
+    FS-->>V: dados atualizados
 
----
+41. Fluxo técnico de importação
 
-# 18. Autenticação
+sequenceDiagram
+    participant U as Usuário
+    participant V as ImportarEntregaModal
+    participant DS as Service HTTP
+    participant C as DocumentoImportacaoController
+    participant IS as DocumentoImportacaoService
+    participant OCR as OCR local
+    participant DB as PostgreSQL
 
-A API operacional é protegida por Laravel Sanctum.
+    U->>V: seleciona foto(s) ou PDF
+    V->>DS: envia arquivo(s)
+    DS->>C: request de preview
+    C->>IS: gerarPreview()
+    IS->>DB: registra documento
+    IS->>OCR: extrair texto
+    OCR-->>IS: texto extraído
+    IS->>IS: parser / estruturação
+    IS-->>C: prévia
+    C-->>DS: JSON
+    DS-->>V: campos editáveis
+    U->>V: confere/corrige
+    V->>DS: confirma importação
+    DS->>C: confirmação
+    C->>DB: cria/reutiliza cliente e entrega
+
+42. Dashboard
+
+A Dashboard utiliza dados consolidados da operação.
+
+Arquiteturalmente:
+
+Banco
+ ↓
+consulta/serviço do Dashboard
+ ↓
+API
+ ↓
+DashboardView
+ ↓
+componentes específicos
+
+A Dashboard não deve duplicar regras de saldo.
+
+Ela deve consumir resultados calculados a partir das fontes oficiais.
+
+43. Relatórios
+
+O módulo de relatórios segue o mesmo princípio.
+
+Filtro do usuário
+ ↓
+Service HTTP
+ ↓
+Controller / consulta
+ ↓
+PostgreSQL
+ ↓
+agregação
+ ↓
+JSON
+ ↓
+tela de relatório
+
+Consultas de período devem utilizar o fuso operacional:
+
+America/Fortaleza
+
+A conversão de limites locais para consulta deve acontecer de forma consistente.
+
+44. Tempo e timezone
+
+Existe distinção entre:
+
+horário de armazenamento
+e
+horário operacional
+
+O sistema utiliza configuração:
+
+APP_OPERATION_TIMEZONE=America/Fortaleza
+
+Consultas como:
+
+01/09/2026 00:00
+até
+01/09/2026 23:59:59
+
+devem ser convertidas corretamente antes de consultar timestamps armazenados.
+
+45. Gestão de usuários
+
+A gestão de usuários é um módulo administrativo.
 
 Arquitetura:
 
-```text
-Vue
-  ↓
-Axios com cookies/credenciais
-  ↓
-Sanctum
-  ↓
-auth:sanctum
-  ↓
-Controller
-```
+UsuariosView
+ ↓
+auth/service
+ ↓
+API protegida
+ ↓
+validação ADMIN
+ ↓
+User model
+ ↓
+PostgreSQL
 
-O usuário autenticado pode ser utilizado para registrar:
+Operações incluem:
 
-- quem criou a carrada;
-- quem registrou movimentação;
-- quem registrou devolução;
-- quem registrou retorno.
+listar usuários;
 
----
+criar;
 
-# 19. Separação das regras críticas
+editar;
 
-As seguintes regras devem existir no backend, mesmo que o frontend também faça validações:
+alterar perfil;
 
-```text
+ativar;
+
+desativar;
+
+redefinir senha.
+
+A segurança não pode depender da existência ou ausência de botões na interface.
+
+46. Segurança das senhas
+
+Senhas devem utilizar hashing fornecido pelo Laravel.
+
+Nunca persistir senha em texto puro.
+
+O Model pode utilizar cast de senha com hash e/ou Hash::make() conforme o fluxo implementado.
+
+47. Usuário ativo
+
+A propriedade:
+
+ativo
+
+é parte da segurança operacional.
+
+O usuário inativo deve ser bloqueado pelo backend.
+
+Isso evita que uma sessão ou chamada direta à API ignore a restrição visual.
+
+48. Regras críticas no backend
+
+As regras abaixo devem existir no backend mesmo quando também forem verificadas no frontend:
+
 entregue <= carregado
 
 programado <= saldo disponível
@@ -786,158 +1445,203 @@ carrada só finaliza com todos os retornos
 
 DEVOLVIDO não gera reentrega
 
-REENTREGA não volta como saldo normal
-```
+REENTREGA não volta para saldo normal
 
-O frontend melhora UX.
+usuário inativo não opera
+
+ação ADMIN exige autorização
+
+dados OCR exigem confirmação
+
+O frontend melhora a experiência.
 
 O backend protege a integridade.
 
----
+49. Data de lançamento das entregas
 
-# 20. Organização recomendada do backend
+created_at da entrega representa sua data de entrada no sistema.
 
-Estrutura de referência:
+A API já expõe esse valor.
 
-```text
-backend/
-├── app/
-│   ├── Enums/
-│   │
-│   ├── Http/
-│   │   ├── Controllers/
-│   │   ├── Requests/
-│   │   │   ├── Entregas/
-│   │   │   ├── Pendencias/
-│   │   │   └── Saidas/
-│   │   └── Resources/
-│   │
-│   ├── Models/
-│   │
-│   └── Services/
-│
-├── database/
-│   ├── migrations/
-│   ├── factories/
-│   └── seeders/
-│
-├── routes/
-│   └── api.php
-│
-└── tests/
-    └── Feature/
-```
+A listagem permite ordenar por:
 
----
+mais antigas primeiro
+mais recentes primeiro
 
-# 21. Testes
+A ordenação deve ser feita no backend antes da paginação.
 
-As regras mais importantes devem possuir testes de integração/Feature.
+Motivo:
 
-Exemplo de suíte existente:
+ordenar somente os 20 itens carregados
+!=
+ordenar o conjunto real
 
-```text
-tests/Feature/SaidaTest.php
-```
+50. Paginação
 
-Cenários relevantes:
-
-- criar carrada;
-- adicionar entrega;
-- dividir produto entre carradas;
-- impedir quantidade acima do saldo;
-- iniciar;
-- registrar retorno;
-- gerar pendência somente do que saiu;
-- devolução não gerar pendência;
-- reentrega;
-- reentrega parcial;
-- finalizar;
-- cancelar.
-
----
-
-# 22. Convenções arquiteturais
-
-## 22.1 Regra de negócio
-
-Preferir:
-
-```text
-Service
-```
-
-e não duplicar lógica em:
-
-```text
-Controller
-Vue
-Resource
-```
-
----
-
-## 22.2 Validação HTTP
-
-Preferir:
-
-```text
-FormRequest
-```
-
----
-
-## 22.3 Saída HTTP
-
-Preferir:
-
-```text
-Resource
-```
-
-ou resposta JSON explícita quando o endpoint for operacional e específico.
-
----
-
-## 22.4 Estado histórico
-
-Não recalcular fatos históricos de forma destrutiva.
-
-Utilizar:
-
-- tabelas históricas;
-- snapshots;
-- eventos;
-- movimentações.
-
----
-
-## 22.5 Nomes do domínio
-
-Utilizar a linguagem da operação.
+Listagens com muitos registros devem preferir paginação no backend.
 
 Exemplos:
 
-```text
+entregas;
+
+carradas;
+
+clientes;
+
+usuários quando necessário.
+
+O frontend deve utilizar os metadados retornados pela API, como:
+
+current_page
+last_page
+per_page
+total
+
+51. Testes
+
+Regras críticas devem possuir testes automatizados.
+
+A suíte mais importante criada durante o desenvolvimento está em:
+
+tests/Feature/SaidaTest.php
+
+Cenários já trabalhados incluem:
+
+criação de carrada;
+
+adição de entrega;
+
+programação parcial;
+
+bloqueio acima do saldo;
+
+início;
+
+retorno;
+
+pendência;
+
+devolução;
+
+reentrega;
+
+reentrega parcial;
+
+finalização;
+
+cancelamento.
+
+A arquitetura deve continuar favorecendo testabilidade.
+
+52. Convenções arquiteturais
+
+52.1 Regra de negócio
+
+Preferir:
+
+Service
+
+Evitar duplicar lógica em:
+
+Controller
+Vue
+Resource
+
+52.2 Validação HTTP
+
+Preferir:
+
+FormRequest
+
+quando a operação possuir payload relevante.
+
+52.3 Saída HTTP
+
+Preferir:
+
+Resource
+
+para entidades e listagens padronizadas.
+
+Utilizar JSON explícito para endpoints operacionais muito específicos quando fizer mais sentido.
+
+52.4 Tipagem
+
+Quando contrato HTTP mudar:
+
+backend
+ ↓
+Resource / JSON
+ ↓
+TypeScript
+ ↓
+componentes
+
+Todos os pontos afetados devem ser revisados.
+
+52.5 Histórico
+
+Não recalcular fatos passados de forma destrutiva.
+
+Preferir:
+
+tabelas históricas;
+
+snapshots;
+
+eventos;
+
+movimentações.
+
+52.6 Linguagem de domínio
+
+Utilizar termos próximos da operação real:
+
 Carrada
 Reentrega
 Devolução
 Pendência
 Carregado
 Entregue
-```
 
-Isso aproxima código, documentação e uso real do sistema.
+Isso aproxima:
 
----
+código;
 
-# 23. Princípio arquitetural central
+documentação;
 
-O sistema deve manter uma única fonte de verdade para cada tipo de informação.
+interface;
 
-Exemplo:
+operação real.
 
-```text
+52.7 Componentização
+
+Não criar componentes apenas por criar.
+
+Extrair quando houver ganho real em:
+
+legibilidade;
+
+reutilização;
+
+testabilidade;
+
+manutenção.
+
+52.8 CSS
+
+Evitar CSS gigante dentro de páginas quando o módulo já possui estilo próprio.
+
+Preferir:
+
+styles/pages/<dominio>/
+
+53. Princípio de fonte única de verdade
+
+O sistema deve manter uma fonte oficial para cada fato.
+
+Exemplos:
+
 Entrega realizada
 → tentativa_items
 
@@ -952,39 +1656,125 @@ Quantidade encerrada por devolução
 
 Histórico temporal da carrada
 → saida_eventos
-```
 
-Evitar representar a mesma informação de maneiras concorrentes que possam produzir resultados diferentes.
+Data de lançamento
+→ entregas.created_at
 
----
+Usuário autenticado
+→ sessão / backend
 
-# 24. Evolução futura
+Evitar representar o mesmo fato em lugares concorrentes com regras diferentes.
 
-A arquitetura atual permite evoluir para:
+54. Dependência entre camadas
 
-- OCR;
-- importação de documentos;
-- dashboard;
-- relatórios;
-- ocorrências operacionais;
-- cálculo de custos;
-- mobile;
-- integrações externas.
+Dependências devem apontar preferencialmente para dentro do domínio, não o contrário.
 
-Ao adicionar novos módulos, preservar o fluxo:
+Exemplo desejado:
 
-```text
-Frontend
-   ↓
-Service HTTP
-   ↓
+Vue
+ ↓
+service HTTP
+ ↓
 Controller
-   ↓
-Request
-   ↓
+ ↓
+Service
+ ↓
+Model
+
+Evitar:
+
+Model
+→ componente Vue
+
 Service de negócio
-   ↓
-Models / Banco
-   ↓
-Resource / JSON
-```
+→ detalhe visual
+
+Controller
+→ CSS/estado de interface
+
+55. Evolução futura
+
+A arquitetura já suporta crescimento para:
+
+ocorrências operacionais mais completas;
+
+planejamento avançado;
+
+cálculo de custo;
+
+otimização de rotas;
+
+cálculo de capacidade;
+
+mobile;
+
+integração com ERP;
+
+integrações externas;
+
+relatórios gerenciais mais avançados.
+
+OCR, Dashboard e relatórios básicos deixam de ser classificados como arquitetura futura porque já fazem parte da aplicação.
+
+56. Fluxo padrão para novos módulos
+
+Ao adicionar um novo módulo, seguir preferencialmente:
+
+1. Entidade / regra
+2. Migration
+3. Model
+4. Enum, se necessário
+5. Form Request
+6. Service de negócio
+7. Controller
+8. Resource / contrato JSON
+9. Route
+10. TypeScript types
+11. Service HTTP
+12. Página
+13. Componentes
+14. CSS
+15. Testes
+16. Documentação
+
+Nem todo módulo precisará de todas as camadas.
+
+A complexidade deve justificar a abstração.
+
+57. Princípio arquitetural central
+
+A arquitetura deve manter alinhamento entre:
+
+operação real
+↓
+regra de negócio
+↓
+modelo de dados
+↓
+backend
+↓
+API
+↓
+frontend
+↓
+documentação
+↓
+testes
+
+Quando qualquer uma dessas partes evoluir, as demais devem ser revisadas quando aplicável.
+
+O objetivo não é apenas fazer a tela funcionar.
+
+O objetivo é manter um sistema:
+
+confiável;
+
+compreensível;
+
+rastreável;
+
+seguro;
+
+testável;
+
+evolutivo.

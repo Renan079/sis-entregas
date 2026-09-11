@@ -1,213 +1,1051 @@
-# Endpoints da API
+Endpoints da API
 
-## 1. Objetivo
+1. Objetivo
 
-Este documento registra os endpoints atuais da API do Sistema de Gerenciamento de Entregas.
+Este documento registra os endpoints atuais do Sistema de Gerenciamento de Entregas.
 
-Base local utilizada no ambiente atual:
+Ele serve como referência para:
 
-```text
+frontend;
+
+backend;
+
+testes;
+
+manutenção;
+
+integração entre módulos;
+
+evolução futura da API.
+
+A documentação considera as rotas atuais do projeto, incluindo:
+
+autenticação;
+
+usuários;
+
+regiões;
+
+clientes;
+
+veículos;
+
+entregas;
+
+pendências;
+
+carradas;
+
+históricos;
+
+Dashboard;
+
+importação/OCR;
+
+relatórios.
+
+2. Endereços do ambiente local
+
+Backend:
+
 http://127.0.0.1:8001
-```
 
-Prefixo das rotas:
+Frontend:
 
-```text
+http://127.0.0.1:5173
+
+Rotas operacionais da API utilizam o prefixo:
+
 /api
-```
 
 Exemplo:
 
-```text
-GET http://127.0.0.1:8001/api/saidas
-```
+GET http://127.0.0.1:8001/api/entregas
 
----
+As rotas de sessão:
 
-# 2. Autenticação
+/login
+/register
+/logout
 
-As rotas operacionais abaixo estão dentro de:
+não utilizam o prefixo /api.
 
-```php
-Route::middleware('auth:sanctum')
-```
+3. Autenticação e proteção das rotas
 
-Portanto, exigem sessão autenticada pelo Laravel Sanctum.
+As rotas operacionais atuais são agrupadas com:
 
----
+Route::middleware([
+    'auth:sanctum',
+    EnsureUserIsActive::class,
+])
 
-# 3. Formato geral
+Portanto, para acessar a API operacional, o usuário precisa:
 
-Respostas de recursos normalmente seguem:
+possuir sessão autenticada;
 
-```json
+estar com a conta ativa.
+
+Arquitetura:
+
+Vue
+ ↓
+Axios
+ ↓
+cookies / XSRF
+ ↓
+Laravel Sanctum
+ ↓
+auth:sanctum
+ ↓
+EnsureUserIsActive
+ ↓
+Controller
+
+4. Formato geral das respostas
+
+Resources normalmente seguem:
+
 {
   "data": {}
 }
-```
 
-Listagens paginadas podem incluir:
+Listagens podem seguir:
 
-```json
 {
   "data": [],
-  "links": {},
   "meta": {}
 }
-```
 
-Erros de validação seguem o padrão do Laravel.
+Alguns endpoints retornam também informações extras, como:
 
----
+{
+  "data": [],
+  "resumo": {},
+  "meta": {}
+}
 
-# 4. Usuário autenticado
+Erros de validação utilizam o padrão do Laravel.
 
-## `GET /api/user`
+Exemplo conceitual:
 
-Retorna o usuário autenticado.
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "campo": [
+      "Mensagem de validação."
+    ]
+  }
+}
 
-### Resposta
+5. CSRF — Laravel Sanctum
 
-```json
+GET /sanctum/csrf-cookie
+
+Inicializa a proteção CSRF necessária para autenticação por sessão.
+
+O frontend chama esse endpoint antes do login.
+
+Fluxo:
+
+GET /sanctum/csrf-cookie
+↓
+POST /login
+↓
+GET /api/user
+
+6. Login
+
+POST /login
+
+Realiza autenticação.
+
+Payload
+
+{
+  "email": "admin@sistema.com",
+  "password": "senha"
+}
+
+O e-mail é normalizado para minúsculas.
+
+Regras
+
+e-mail é obrigatório;
+
+senha é obrigatória;
+
+credenciais precisam ser válidas;
+
+usuário precisa estar ativo.
+
+Resposta de sucesso
+
+{
+  "message": "Login realizado com sucesso.",
+  "user": {
+    "id": 1,
+    "name": "Administrador",
+    "email": "admin@sistema.com",
+    "perfil": "ADMIN",
+    "ativo": true
+  }
+}
+
+Usuário inativo
+
+A sessão é encerrada e a API retorna erro de validação.
+
+7. Logout
+
+POST /logout
+
+Exige sessão autenticada.
+
+Encerra a sessão atual.
+
+Resposta
+
+{
+  "message": "Logout realizado com sucesso."
+}
+
+O backend:
+
+realiza logout;
+
+invalida a sessão;
+
+regenera o token CSRF.
+
+8. Usuário autenticado
+
+GET /api/user
+
+Retorna o usuário da sessão atual.
+
+Exemplo
+
 {
   "id": 1,
   "name": "Administrador",
-  "email": "admin@sistema.com"
+  "email": "admin@sistema.com",
+  "perfil": "ADMIN",
+  "ativo": true
 }
-```
 
-Os campos adicionais dependem do Model `User`.
+Esse endpoint é utilizado pelo frontend para restaurar o estado de autenticação.
 
----
+9. Cadastro administrativo de usuário
 
-# 5. Regiões
+POST /register
+
+O sistema não possui cadastro público de usuário.
+
+A rota exige:
+
+sessão autenticada
++
+perfil ADMIN
+
+Payload
+
+{
+  "name": "Operador 01",
+  "email": "operador@sistema.com",
+  "password": "senha-segura",
+  "password_confirmation": "senha-segura"
+}
+
+Resultado
+
+O usuário é criado automaticamente como:
+
+perfil = OPERADOR
+ativo = true
+
+Resposta
+
+201 Created
+
+Exemplo:
+
+{
+  "message": "Usuário cadastrado com sucesso.",
+  "user": {
+    "id": 2,
+    "name": "Operador 01",
+    "email": "operador@sistema.com",
+    "perfil": "OPERADOR",
+    "ativo": true
+  }
+}
+
+Sem permissão
+
+Usuário não administrador recebe:
+
+403 Forbidden
+
+10. Gestão de usuários
+
+As rotas abaixo são administrativas.
+
+O UsuarioController também valida explicitamente que o usuário autenticado possui:
+
+perfil = ADMIN
+ativo = true
+
+10.1 Listar usuários
+
+GET /api/usuarios
+
+Query parameters
+
+busca
+page
+per_page
+
+Valores permitidos para per_page:
+
+10
+20
+50
+
+busca procura por:
+
+nome;
+
+e-mail.
+
+Exemplo
+
+GET /api/usuarios?busca=renan&page=1&per_page=10
+
+Resposta
+
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "Administrador",
+      "email": "admin@sistema.com",
+      "perfil": "ADMIN",
+      "ativo": true,
+      "created_at": "2026-08-01T12:00:00.000000Z",
+      "updated_at": "2026-09-01T12:00:00.000000Z"
+    }
+  ],
+  "resumo": {
+    "total": 2,
+    "ativos": 2,
+    "admins": 1,
+    "operadores": 1
+  },
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 10,
+    "total": 2
+  }
+}
+
+A ordenação coloca administradores primeiro e depois ordena por nome.
+
+10.2 Atualizar usuário
+
+PUT /api/usuarios/{usuario}
+
+Payload
+
+{
+  "name": "Operador Atualizado",
+  "email": "operador@sistema.com",
+  "perfil": "OPERADOR",
+  "ativo": true
+}
+
+Perfis aceitos
+
+ADMIN
+OPERADOR
+
+Proteções
+
+O administrador autenticado não pode:
+
+remover seu próprio perfil ADMIN;
+
+desativar a própria conta.
+
+Resposta
+
+{
+  "message": "Usuário atualizado com sucesso.",
+  "user": {}
+}
+
+10.3 Redefinir senha
+
+PUT /api/usuarios/{usuario}/senha
+
+Payload
+
+{
+  "password": "nova-senha",
+  "password_confirmation": "nova-senha"
+}
+
+Resposta
+
+{
+  "message": "Senha de Operador redefinida com sucesso."
+}
+
+11. Regiões
 
 As rotas são geradas por:
 
-```php
-Route::apiResource('regioes', RegiaoController::class)
-```
+Route::apiResource(
+    'regioes',
+    RegiaoController::class
+)
 
-> Observação: a URL utiliza `regioes`, enquanto a tabela física atual é `regiaos`.
+A URL utiliza regioes, mas a tabela física atual é regiaos.
 
-| Método | Endpoint | Objetivo |
-|---|---|---|
-| GET | `/api/regioes` | Listar regiões |
-| POST | `/api/regioes` | Criar região |
-| GET | `/api/regioes/{regiao}` | Buscar região |
-| PUT/PATCH | `/api/regioes/{regiao}` | Atualizar região |
-| DELETE | `/api/regioes/{regiao}` | Remover/desativar conforme regra do controller |
+Método
 
----
+Endpoint
 
-# 6. Clientes
+Objetivo
 
-As rotas são geradas por:
+GET
 
-```php
-Route::apiResource('clientes', ClienteController::class)
-```
+/api/regioes
 
-| Método | Endpoint | Objetivo |
-|---|---|---|
-| GET | `/api/clientes` | Listar/pesquisar clientes |
-| POST | `/api/clientes` | Criar cliente |
-| GET | `/api/clientes/{cliente}` | Buscar cliente |
-| PUT/PATCH | `/api/clientes/{cliente}` | Atualizar cliente |
-| DELETE | `/api/clientes/{cliente}` | Remover/desativar conforme regra |
+Listar regiões
 
----
+POST
 
-# 7. Entregas
+/api/regioes
+
+Criar região
+
+GET
+
+/api/regioes/{regiao}
+
+Buscar região
+
+PUT/PATCH
+
+/api/regioes/{regiao}
+
+Atualizar região
+
+DELETE
+
+/api/regioes/{regiao}
+
+Remover/inativar conforme regra atual
+
+Regiões são utilizadas em:
+
+entregas;
+
+rotas;
+
+filtros;
+
+Dashboard;
+
+localização de entregas disponíveis;
+
+localização de pendências.
+
+12. Clientes
 
 As rotas básicas são geradas por:
 
-```php
-Route::apiResource('entregas', EntregaController::class)
-```
+Route::apiResource(
+    'clientes',
+    ClienteController::class
+)
 
-| Método | Endpoint | Objetivo |
-|---|---|---|
-| GET | `/api/entregas` | Listar entregas |
-| POST | `/api/entregas` | Criar entrega |
-| GET | `/api/entregas/{entrega}` | Buscar entrega |
-| PUT/PATCH | `/api/entregas/{entrega}` | Atualizar entrega |
-| DELETE | `/api/entregas/{entrega}` | Cancelar/remover conforme implementação |
+Método
 
-A listagem pode utilizar filtros definidos pelo `EntregaController`, como status, região, prioridade e busca.
+Endpoint
 
----
+Objetivo
 
-# 8. Veículos
+GET
+
+/api/clientes
+
+Listar/pesquisar clientes
+
+POST
+
+/api/clientes
+
+Criar cliente
+
+GET
+
+/api/clientes/{cliente}
+
+Buscar cliente
+
+PUT/PATCH
+
+/api/clientes/{cliente}
+
+Atualizar cliente
+
+DELETE
+
+/api/clientes/{cliente}
+
+Remover/inativar conforme regra
+
+13. Histórico de cliente
+
+GET /api/clientes/{cliente}/entregas
+
+Retorna o histórico de entregas associado ao cliente.
+
+Query parameters
+
+page
+per_page
+
+Resposta conceitual
+
+{
+  "data": {
+    "cliente": {
+      "id": 1,
+      "codigo_externo": null,
+      "nome": "João",
+      "apelido": null,
+      "telefone": null,
+      "ativo": true
+    },
+    "resumo": {
+      "total": 10,
+      "pendentes": 2,
+      "programadas": 1,
+      "em_saida": 0,
+      "parciais": 1,
+      "concluidas": 6,
+      "nao_entregues": 0,
+      "canceladas": 0
+    },
+    "entregas": [],
+    "meta": {
+      "current_page": 1,
+      "last_page": 1,
+      "per_page": 10,
+      "total": 10
+    }
+  }
+}
+
+Cada entrega pode incluir:
+
+número do pedido;
+
+status;
+
+prioridade;
+
+endereço;
+
+referência;
+
+observação;
+
+região;
+
+itens;
+
+created_at.
+
+14. Veículos
 
 As rotas são geradas por:
 
-```php
-Route::apiResource('veiculos', VeiculoController::class)
-```
+Route::apiResource(
+    'veiculos',
+    VeiculoController::class
+)
 
-| Método | Endpoint | Objetivo |
-|---|---|---|
-| GET | `/api/veiculos` | Listar veículos |
-| POST | `/api/veiculos` | Criar veículo |
-| GET | `/api/veiculos/{veiculo}` | Buscar veículo |
-| PUT/PATCH | `/api/veiculos/{veiculo}` | Atualizar veículo |
-| DELETE | `/api/veiculos/{veiculo}` | Remover/desativar conforme regra |
+Método
 
----
+Endpoint
 
-# 9. Carradas — listagem
+Objetivo
 
-## `GET /api/saidas`
+GET
 
-Lista carradas de forma paginada.
+/api/veiculos
 
-### Query parameters conhecidos
+Listar veículos
 
-```text
+POST
+
+/api/veiculos
+
+Criar veículo
+
+GET
+
+/api/veiculos/{veiculo}
+
+Buscar veículo
+
+PUT/PATCH
+
+/api/veiculos/{veiculo}
+
+Atualizar veículo
+
+DELETE
+
+/api/veiculos/{veiculo}
+
+Remover/inativar conforme regra
+
+15. Entregas — rotas básicas
+
+As rotas são geradas por:
+
+Route::apiResource(
+    'entregas',
+    EntregaController::class
+)
+
+Método
+
+Endpoint
+
+Objetivo
+
+GET
+
+/api/entregas
+
+Listar entregas
+
+POST
+
+/api/entregas
+
+Criar entrega
+
+GET
+
+/api/entregas/{entrega}
+
+Buscar entrega
+
+PUT/PATCH
+
+/api/entregas/{entrega}
+
+Atualizar entrega
+
+DELETE
+
+/api/entregas/{entrega}
+
+Cancelar entrega
+
+16. Listar entregas
+
+GET /api/entregas
+
+A listagem é paginada em:
+
+20 registros por página
+
+Query parameters
+
+busca
+regiao_id
+status
+prioridade
+ordem
+page
+
+16.1 Busca
+
+busca pesquisa por:
+
+numero_pedido;
+
+cliente_nome;
+
+cliente_apelido;
+
+cliente_telefone;
+
+endereco.
+
+PostgreSQL utiliza busca case-insensitive com ILIKE.
+
+16.2 Filtro por região
+
+regiao_id
+
+Exemplo:
+
+GET /api/entregas?regiao_id=2
+
+16.3 Filtro por status
+
+status
+
+Estados:
+
+PENDENTE
+PROGRAMADA
+EM_SAIDA
+PARCIAL
+CONCLUIDA
+NAO_ENTREGUE
+CANCELADA
+
+16.4 Filtro por prioridade
+
+prioridade
+
+Valores:
+
+BAIXA
+NORMAL
+ALTA
+URGENTE
+
+16.5 Ordenação por data de lançamento
+
+ordem
+
+Valores utilizados pelo frontend:
+
+antigas
+recentes
+
+Mais antigas primeiro
+
+GET /api/entregas?ordem=antigas
+
+Ordenação:
+
+created_at ASC
+id ASC
+
+Mais recentes primeiro
+
+GET /api/entregas?ordem=recentes
+
+Ordenação:
+
+created_at DESC
+id DESC
+
+Padrão
+
+Se ordem não for recentes, o backend utiliza as mais antigas primeiro.
+
+A ordenação acontece antes da paginação.
+
+17. Estrutura de uma entrega
+
+O EntregaResource expõe campos como:
+
+{
+  "id": 10,
+  "numero_pedido": "89567",
+  "cliente": {
+    "id": 1,
+    "nome": "João",
+    "apelido": null
+  },
+  "regiao": {
+    "id": 2,
+    "nome": "Serra de São João",
+    "cidade": null
+  },
+  "cliente_nome": "João",
+  "cliente_apelido": null,
+  "cliente_telefone": null,
+  "endereco": "Rua A",
+  "referencia": null,
+  "prioridade": "NORMAL",
+  "status": "PENDENTE",
+  "observacao": null,
+  "itens": [],
+  "created_at": "2026-09-11T12:00:00.000000Z",
+  "updated_at": "2026-09-11T12:00:00.000000Z"
+}
+
+created_at é usado pela tela para mostrar a data de lançamento.
+
+18. Criar entrega
+
+POST /api/entregas
+
+Payload conceitual
+
+{
+  "numero_pedido": "89567",
+  "cliente_id": 1,
+  "regiao_id": 2,
+  "cliente_nome": "João",
+  "cliente_apelido": null,
+  "cliente_telefone": null,
+  "endereco": "Rua A",
+  "referencia": "Próximo à praça",
+  "prioridade": "NORMAL",
+  "observacao": null,
+  "itens": [
+    {
+      "codigo_produto": "148",
+      "descricao_produto": "Argamassa AC3",
+      "unidade": "UN",
+      "quantidade_solicitada": 50,
+      "observacao": null
+    }
+  ]
+}
+
+Se cliente_id for informado, o backend utiliza os dados atuais do cliente como snapshot.
+
+A entrega nasce com:
+
+status = PENDENTE
+
+Também é registrado:
+
+criado_por = usuário autenticado
+
+E um evento:
+
+ENTREGA_CRIADA
+
+Resposta
+
+201 Created
+
+19. Atualizar entrega
+
+PUT/PATCH /api/entregas/{entrega}
+
+Atualiza dados permitidos da entrega.
+
+Regra crítica
+
+Depois que a entrega já possuir tentativa, seus itens não podem ser substituídos.
+
+O backend retorna erro de validação se uma atualização tentar alterar os itens depois de existir histórico operacional.
+
+A atualização gera evento:
+
+ENTREGA_ATUALIZADA
+
+20. Cancelar entrega
+
+DELETE /api/entregas/{entrega}
+
+O endpoint não realiza exclusão física.
+
+Ele altera o status para:
+
+CANCELADA
+
+Proteção
+
+Entrega CONCLUIDA não pode ser cancelada.
+
+Evento
+
+ENTREGA_CANCELADA
+
+Resposta
+
+204 No Content
+
+21. Histórico da entrega
+
+GET /api/entregas/{entrega}/historico
+
+Retorna a visão quantitativa e histórica da entrega.
+
+Informações por item incluem:
+
+comprado
+entregue
+saldo_restante
+pendente
+em_carrada
+nao_enviado
+
+O histórico também inclui:
+
+tentativas;
+
+veículo utilizado;
+
+resultado;
+
+observações;
+
+pendências.
+
+Estrutura conceitual
+
+{
+  "data": {
+    "entrega": {},
+    "itens": [],
+    "tentativas": [],
+    "pendencias": []
+  }
+}
+
+22. Pendências — listagem
+
+GET /api/pendencias
+
+Lista pendências de forma paginada.
+
+Query parameters
+
+busca
+status
+regiao_id
+data_inicio
+data_fim
+per_page
+page
+
+Resposta conceitual
+
+{
+  "data": [],
+  "resumo": {
+    "abertas": 0,
+    "programadas": 0,
+    "resolvidas_30_dias": 0,
+    "total_30_dias": 0
+  },
+  "meta": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 10,
+    "total": 0
+  }
+}
+
+Cada pendência pode informar:
+
+pedido;
+
+cliente;
+
+região;
+
+produto;
+
+quantidade original;
+
+quantidade resolvida;
+
+saldo pendente;
+
+status;
+
+data de abertura;
+
+data de resolução;
+
+carrada atual;
+
+possibilidade de resolução manual.
+
+23. Resolver pendência manualmente
+
+POST /api/pendencias/{pendencia}/resolver-manualmente
+
+Utilizado quando uma pendência será encerrada administrativamente como devolução.
+
+Payload
+
+{
+  "motivo_devolucao": "CLIENTE_DESISTIU",
+  "observacao": "Cliente não deseja mais receber o produto."
+}
+
+Motivos aceitos
+
+CLIENTE_RECUSOU
+CLIENTE_DESISTIU
+PRODUTO_INCORRETO
+PRODUTO_AVARIADO
+QUANTIDADE_EXCEDENTE
+OUTRO
+
+observacao:
+
+opcional
+máximo 500 caracteres
+
+Resposta conceitual
+
+{
+  "data": {
+    "id": 1,
+    "status": "RESOLVIDA",
+    "quantidade_original": 5,
+    "quantidade_resolvida": 5,
+    "saldo_pendente": 0,
+    "data_resolucao": "2026-09-11T12:00:00Z"
+  }
+}
+
+24. Carradas — listagem
+
+GET /api/saidas
+
+Lista carradas.
+
+Query parameters conhecidos
+
 busca
 status
 data
 page
-```
 
-### Busca por carrada
+Busca por número
 
-O campo `busca` aceita texto contendo o número.
+Exemplos aceitos:
 
-Exemplos:
-
-```text
 35
 #35
 Carrada 35
-```
 
-### Exemplo
+Exemplo
 
-```text
 GET /api/saidas?status=PLANEJADA&page=1
-```
 
-ou:
+25. Criar carrada
 
-```text
-GET /api/saidas?busca=%2335
-```
+POST /api/saidas
 
----
+Payload
 
-# 10. Criar carrada
-
-## `POST /api/saidas`
-
-Cria uma nova carrada.
-
-### Payload
-
-```json
 {
-  "data_saida": "2026-08-14",
+  "data_saida": "2026-09-11",
   "regiao_principal_id": 1,
   "veiculo_id": 2,
   "rota": [
@@ -226,134 +1064,102 @@ Cria uma nova carrada.
   ],
   "observacao": null
 }
-```
 
-### Regras de validação atuais
+Regras conhecidas
 
-`data_saida`:
+data_saida:
 
-```text
 required
 date
-```
 
-`regiao_principal_id`:
+regiao_principal_id:
 
-```text
 nullable
 exists:regiaos,id
-```
 
-`veiculo_id`:
+veiculo_id:
 
-```text
 nullable
 exists:veiculos,id
-```
 
-`rota`:
+rota:
 
-```text
 nullable
 array
-máximo de 30 paradas
-```
+máximo 30 paradas
 
-`rota.*.regiao_id`:
+rota.*.regiao_id:
 
-```text
 nullable
 exists:regiaos,id
-```
 
-`rota.*.nome`:
+rota.*.nome:
 
-```text
 string
 máximo 150 caracteres
-```
 
-`observacao`:
+observacao:
 
-```text
 nullable
 máximo 2000 caracteres
-```
 
----
+26. Buscar carrada
 
-# 11. Buscar carrada
+GET /api/saidas/{saida}
 
-## `GET /api/saidas/{saida}`
+Retorna detalhes da carrada.
 
-Retorna os dados de uma carrada.
+Pode incluir:
 
-Inclui informações carregadas pelo backend como:
+região principal;
 
-- região principal;
-- veículo;
-- entregas normais;
-- itens programados;
-- equipe;
-- pendências.
+veículo;
 
----
+rota;
 
-# 12. Entregas normais disponíveis pela rota
+entregas normais;
 
-## `GET /api/saidas/{saida}/entregas-disponiveis`
+itens programados;
 
-Retorna entregas que podem ser adicionadas à carrada considerando **todas as regiões cadastradas na rota**.
+equipe;
 
-### Regras
+pendências/reentregas.
 
-São consideradas entregas nos estados:
+27. Entregas disponíveis pela rota
 
-```text
+GET /api/saidas/{saida}/entregas-disponiveis
+
+Retorna entregas que podem ser adicionadas à carrada.
+
+O backend considera as regiões cadastradas presentes em rota.
+
+Estados considerados
+
 PENDENTE
 PROGRAMADA
 PARCIAL
 NAO_ENTREGUE
-```
 
-Além disso:
+Regras
 
-- a região da entrega precisa estar na rota;
-- entregas já presentes na carrada são excluídas;
-- a entrega precisa possuir pelo menos um item com saldo normal disponível;
-- uma entrega `PARCIAL` que possui somente pendência não aparece aqui;
-- a ordenação segue a ordem das regiões na rota.
+região precisa fazer parte da rota;
 
-### Resposta simplificada
+entrega já adicionada à carrada é excluída;
 
-```json
-{
-  "data": [
-    {
-      "id": 10,
-      "numero_pedido": "89567",
-      "cliente_nome": "João",
-      "endereco": "Rua A",
-      "regiao_id": 2,
-      "regiao_nome": "Serra de São João",
-      "status": "PENDENTE",
-      "prioridade": "NORMAL"
-    }
-  ]
-}
-```
+precisa existir saldo normal disponível;
 
----
+entrega com somente pendência não volta como entrega normal;
 
-# 13. Itens disponíveis de uma entrega
+a ordem acompanha a rota.
 
-## `GET /api/planejamento/entregas/{entrega}/itens-disponiveis`
+28. Itens disponíveis para planejamento
 
-Retorna os produtos e seus saldos disponíveis para programação em carrada.
+GET /api/planejamento/entregas/{entrega}/itens-disponiveis
 
-### Resposta
+Retorna produtos e quantidade disponível para uma nova programação normal.
 
-```json
+Exemplo
+
 {
   "data": {
     "entrega_id": 10,
@@ -372,33 +1178,23 @@ Retorna os produtos e seus saldos disponíveis para programação em carrada.
     ]
   }
 }
-```
 
-### Observação
+quantidade_disponivel considera:
 
-`quantidade_disponivel` não significa simplesmente:
+entregue;
 
-```text
-solicitado - entregue
-```
+devolvido;
 
-O cálculo também considera:
+pendências ativas;
 
-- devoluções;
-- pendências ativas;
-- reservas em carradas.
+reservas em carradas.
 
----
+29. Adicionar entrega à carrada
 
-# 14. Adicionar entrega à carrada
+POST /api/saidas/{saida}/entregas
 
-## `POST /api/saidas/{saida}/entregas`
+Payload conceitual
 
-Adiciona uma entrega normal à carrada.
-
-### Payload conceitual
-
-```json
 {
   "entrega_id": 10,
   "ordem": 1,
@@ -409,91 +1205,55 @@ Adiciona uma entrega normal à carrada.
     }
   ]
 }
-```
 
-`ordem` é opcional.
+Regras
 
-A lista `itens` permite programação parcial.
+carrada precisa estar PLANEJADA;
 
-### Regras principais
+entrega precisa estar em estado compatível;
 
-- carrada precisa estar `PLANEJADA`;
-- entrega não pode estar em estado final incompatível;
-- produto precisa pertencer à entrega;
-- quantidade precisa ser maior que zero;
-- quantidade não pode superar o saldo disponível.
+item precisa pertencer à entrega;
 
----
+quantidade precisa ser positiva;
 
-# 15. Remover entrega da carrada
+quantidade não pode superar saldo disponível.
 
-## `DELETE /api/saidas/{saida}/entregas/{entrega}`
+30. Remover entrega da carrada
 
-Remove uma entrega normal de uma carrada.
+DELETE /api/saidas/{saida}/entregas/{entrega}
 
-### Regra
+Permitido enquanto a carrada estiver:
 
-A remoção só é permitida enquanto a carrada estiver:
-
-```text
 PLANEJADA
-```
 
----
+A remoção libera as reservas correspondentes.
 
-# 16. Pendências disponíveis pela rota
+31. Pendências disponíveis pela rota
 
-## `GET /api/saidas/{saida}/pendencias-disponiveis`
+GET /api/saidas/{saida}/pendencias-disponiveis
 
-Lista pendências `ABERTA` que podem ser programadas como reentrega.
+Lista pendências ABERTA que podem entrar como reentrega.
 
-### Regras
+Regras
 
-- entrega precisa pertencer a região cadastrada na rota;
-- pendência precisa possuir saldo maior que zero;
-- pendência precisa estar `ABERTA`;
-- pendência já adicionada à carrada atual não aparece na lista;
-- a ordenação segue a rota.
+região precisa pertencer à rota cadastrada;
 
-### Resposta simplificada
+saldo pendente precisa ser maior que zero;
 
-```json
-{
-  "data": [
-    {
-      "id": 1,
-      "entrega_id": 10,
-      "entrega_item_id": 20,
-      "numero_pedido": "89567",
-      "cliente_nome": "Doquinha de cicero",
-      "endereco": "Serra de São João",
-      "regiao_id": 2,
-      "regiao_nome": "Serra de São João",
-      "codigo_produto": "148",
-      "descricao_produto": "Argamassa AC3",
-      "unidade": "UN",
-      "quantidade_original": 5,
-      "quantidade_resolvida": 0,
-      "saldo_pendente": 5,
-      "status": "ABERTA"
-    }
-  ]
-}
-```
+status precisa ser ABERTA;
 
----
+pendência já adicionada não aparece novamente;
 
-# 17. Pendências da carrada
+ordenação acompanha a rota.
 
-## `GET /api/saidas/{saida}/pendencias`
+32. Pendências vinculadas à carrada
 
-Retorna as reentregas já vinculadas à carrada.
+GET /api/saidas/{saida}/pendencias
 
-A resposta inclui também dados do resultado quando já houver retorno registrado.
+Retorna reentregas que já pertencem à carrada.
 
-Campos utilizados no frontend incluem:
+A resposta pode incluir:
 
-```text
 resultado_registrado
 resultado_id
 quantidade_programada_resultado
@@ -504,89 +1264,69 @@ destino_restante
 motivo_devolucao
 observacao_resultado
 data_hora_resultado
-```
 
----
+33. Adicionar pendência à carrada
 
-# 18. Adicionar pendência à carrada
+POST /api/saidas/{saida}/pendencias/{pendencia}
 
-## `POST /api/saidas/{saida}/pendencias/{pendencia}`
+Programa a pendência como reentrega.
 
-Programa uma pendência como reentrega na carrada.
+Regras
 
-### Resposta
+carrada precisa estar PLANEJADA;
 
-```text
-204 No Content
-```
+pendência precisa possuir saldo;
 
-### Regras principais
+pendência resolvida ou cancelada não pode ser programada;
 
-- carrada deve estar `PLANEJADA`;
-- pendência precisa possuir saldo;
-- pendência resolvida/cancelada não pode ser usada;
-- a mesma pendência não pode ser programada simultaneamente em duas carradas.
+a mesma pendência não pode estar em duas carradas ao mesmo tempo.
 
-Após a operação:
+Estado
 
-```text
 ABERTA → PROGRAMADA
-```
 
----
+Resposta
 
-# 19. Remover pendência da carrada
-
-## `DELETE /api/saidas/{saida}/pendencias/{pendencia}`
-
-Remove uma reentrega de uma carrada planejada.
-
-### Resposta
-
-```text
 204 No Content
-```
 
-### Resultado
+34. Remover pendência da carrada
 
-```text
+DELETE /api/saidas/{saida}/pendencias/{pendencia}
+
+Remove a reentrega de uma carrada planejada.
+
+Resultado
+
 PROGRAMADA → ABERTA
-```
 
----
+Resposta
 
-# 20. Iniciar carrada
+204 No Content
 
-## `POST /api/saidas/{saida}/iniciar`
+35. Iniciar carrada
 
-Inicia a operação física da carrada.
+POST /api/saidas/{saida}/iniciar
 
-### Estado
+Estado
 
-```text
 PLANEJADA → EM_ANDAMENTO
-```
 
-### Regra principal
+Regra
 
-A carrada precisa possuir conteúdo operacional.
+A carrada precisa possuir pelo menos:
 
-Isso pode ser:
+uma entrega normal; ou
 
-- entrega normal;
-- reentrega.
+uma reentrega.
 
----
+36. Registrar retorno de entrega normal
 
-# 21. Registrar retorno de entrega normal
+POST /api/saidas/{saida}/entregas/{entrega}/resultado
 
-## `POST /api/saidas/{saida}/entregas/{entrega}/resultado`
+Registra o resultado real dos itens carregados.
 
-Registra o que realmente aconteceu com os produtos daquela entrega.
+Payload
 
-### Payload
-
-```json
 {
   "itens": [
     {
@@ -601,256 +1341,130 @@ Registra o que realmente aconteceu com os produtos daquela entrega.
       "quantidade_entregue": 18,
       "destino_nao_entregue": "DEVOLVIDO",
       "motivo_devolucao": "CLIENTE_RECUSOU",
-      "observacao": "Cliente não quis receber as duas unidades."
+      "observacao": "Cliente não quis receber duas unidades."
     }
   ],
   "motivo_nao_entrega": null,
   "observacao": null
 }
-```
 
-### `destino_nao_entregue`
+Destino da diferença
 
-Valores aceitos:
-
-```text
 REENTREGA
 DEVOLVIDO
-```
 
-Só é necessário quando existir diferença não entregue.
+Regras
 
-### `motivo_devolucao`
+carrada deve estar EM_ANDAMENTO;
 
-Valores aceitos:
+entrega precisa pertencer à carrada;
 
-```text
-CLIENTE_RECUSOU
-CLIENTE_DESISTIU
-PRODUTO_INCORRETO
-PRODUTO_AVARIADO
-QUANTIDADE_EXCEDENTE
-OUTRO
-```
+retorno não pode ser duplicado;
 
-### Regras principais
+quantidade entregue não pode ser negativa;
 
-- carrada deve estar `EM_ANDAMENTO`;
-- entrega precisa pertencer à carrada;
-- retorno não pode ser registrado duas vezes para a mesma entrega/carrada;
-- quantidade entregue não pode ser negativa;
-- quantidade entregue não pode ultrapassar carregado;
-- item informado precisa estar programado.
+quantidade entregue não pode ultrapassar carregado;
 
-### Resultado
+item precisa estar programado.
 
-Dependendo do destino:
+Efeitos
 
-```text
 REENTREGA
-→ cria pendência
-```
+→ cria/sincroniza pendência
 
-ou:
-
-```text
 DEVOLVIDO
 → registra devolução
-→ não cria pendência
-```
+→ não cria pendência daquela quantidade
 
-### Resposta
+Resposta
 
-```http
 201 Created
-```
 
-Exemplo:
+37. Registrar retorno de reentrega
 
-```json
-{
-  "data": {
-    "id": 50,
-    "entrega_id": 10,
-    "saida_id": 35,
-    "resultado": "PARCIAL",
-    "motivo_nao_entrega": null,
-    "observacao": null,
-    "data_hora": "2026-08-14T23:00:00Z",
-    "itens": [
-      {
-        "id": 70,
-        "entrega_item_id": 20,
-        "quantidade_entregue": 45,
-        "observacao": null
-      }
-    ]
-  }
-}
-```
+POST /api/saidas/{saida}/pendencias/{pendencia}/resultado
 
----
+Reentrega completa
 
-# 22. Registrar retorno de reentrega
-
-## `POST /api/saidas/{saida}/pendencias/{pendencia}/resultado`
-
-Registra o resultado da pendência que foi levada naquela carrada.
-
-### Payload — reentrega completa
-
-```json
 {
   "quantidade_entregue": 5,
   "destino_restante": null,
   "motivo_devolucao": null,
   "observacao": null
 }
-```
 
-### Payload — reentrega parcial que continuará
+Reentrega parcial que continuará
 
-```json
 {
   "quantidade_entregue": 3,
   "destino_restante": "REENTREGA",
   "motivo_devolucao": null,
   "observacao": null
 }
-```
 
-### Payload — reentrega parcial com devolução
+Reentrega parcial com devolução
 
-```json
 {
   "quantidade_entregue": 3,
   "destino_restante": "DEVOLVIDO",
   "motivo_devolucao": "CLIENTE_DESISTIU",
-  "observacao": "Cliente não deseja mais as duas unidades restantes."
+  "observacao": "Cliente não deseja mais receber o restante."
 }
-```
 
-### `destino_restante`
+Regras
 
-Valores:
+pendência precisa pertencer à carrada;
 
-```text
-REENTREGA
-DEVOLVIDO
-```
+quantidade entregue não pode ultrapassar programada;
 
-### Regras
+se restar quantidade, o destino precisa ser definido;
 
-- carrada precisa estar no estado operacional permitido pelo Service;
-- pendência precisa pertencer à carrada;
-- quantidade entregue não pode ultrapassar a quantidade programada da reentrega;
-- se restar quantidade, o destino precisa ser definido;
-- `DEVOLVIDO` registra uma devolução;
-- `REENTREGA` deixa o saldo novamente disponível como pendência.
+REENTREGA mantém obrigação pendente;
 
-### Resposta
+DEVOLVIDO registra devolução.
 
-```http
+Resposta
+
 201 Created
-```
 
-Exemplo:
+38. Finalizar carrada
 
-```json
-{
-  "data": {
-    "id": 12,
-    "saida_id": 35,
-    "pendencia_id": 1,
-    "quantidade_programada": 5,
-    "quantidade_entregue": 3,
-    "quantidade_devolvida": 0,
-    "quantidade_reentrega": 2,
-    "destino_restante": "REENTREGA",
-    "motivo_devolucao": null,
-    "observacao": null,
-    "data_hora": "2026-08-14T23:00:00Z"
-  }
-}
-```
+POST /api/saidas/{saida}/finalizar
 
----
+Finaliza a carrada em andamento.
 
-# 23. Finalizar carrada
+Regra crítica
 
-## `POST /api/saidas/{saida}/finalizar`
+Todos os retornos precisam estar registrados:
 
-Finaliza uma carrada em andamento.
-
-### Regra crítica
-
-Todos os retornos obrigatórios precisam ter sido registrados.
-
-Isso inclui:
-
-```text
 entregas normais
 +
 reentregas
-```
 
-Se existir qualquer operação sem retorno, a finalização deve ser bloqueada.
+Estado
 
-### Estado
-
-```text
 EM_ANDAMENTO → FINALIZADA
-```
 
----
+39. Cancelar carrada
 
-# 24. Cancelar carrada
+POST /api/saidas/{saida}/cancelar
 
-## `POST /api/saidas/{saida}/cancelar`
+Cancela uma carrada quando permitido pelas regras do Service.
 
-Cancela uma carrada quando permitido pela regra de negócio.
+Resposta
 
-### Resposta
-
-```text
 204 No Content
-```
 
-Operações já registradas precisam ser preservadas conforme as proteções do Service.
+Reservas e associações precisam ser tratadas de forma consistente sem destruir o histórico.
 
----
+40. Histórico da carrada
 
-# 25. Histórico da entrega
+GET /api/saidas/{saida}/historico
 
-## `GET /api/entregas/{entrega}/historico`
+Retorna a representação histórica completa da viagem.
 
-Retorna a visão histórica e quantitativa de uma entrega.
+Estrutura conceitual
 
-O histórico é utilizado para exibir informações como:
-
-```text
-Comprado
-Entregue
-Devolvido
-Saldo restante
-Pendência
-Em carrada
-Ainda não enviado
-```
-
-Também pode incluir tentativas e movimentações relacionadas.
-
----
-
-# 26. Histórico da carrada
-
-## `GET /api/saidas/{saida}/historico`
-
-Retorna o histórico operacional completo da carrada.
-
-### Estrutura principal
-
-```json
 {
   "data": {
     "saida": {},
@@ -860,13 +1474,9 @@ Retorna o histórico operacional completo da carrada.
     "eventos": []
   }
 }
-```
 
-### Resumo atual
+Resumo pode incluir
 
-Campos previstos no contrato TypeScript:
-
-```text
 total_entregas
 total_entregas_normais
 total_reentregas
@@ -881,27 +1491,375 @@ quantidade_pendencias_geradas
 quantidade_reentrega_programada
 quantidade_entregue_reentrega
 quantidade_devolvida
-```
 
-### Regra
+Carrada contendo apenas reentrega deve continuar aparecendo como operação válida.
 
-Uma carrada contendo somente reentregas deve retornar:
+41. Dashboard
 
-```text
-total_entregas_normais = 0
-total_reentregas > 0
-total_atendimentos > 0
-```
+GET /api/dashboard
 
-Ela não deve ser considerada uma carrada vazia.
+Não exige parâmetros no fluxo atual.
 
----
+Retorna a visão operacional resumida.
 
-# 27. Estados utilizados pela API
+Estrutura
 
-## Entrega
+{
+  "data": {
+    "resumo": {
+      "entregas_realizadas_mes": 0,
+      "aguardando_programacao": 0,
+      "carradas_hoje": 0,
+      "carradas_planejadas_hoje": 0,
+      "carradas_em_andamento_hoje": 0,
+      "carradas_finalizadas_hoje": 0,
+      "reentregas_abertas": 0,
+      "pedidos_com_problema": 0
+    },
+    "entregas_por_regiao": [],
+    "proximas_entregas": [],
+    "pendencias_atencao": [],
+    "carradas_hoje": [],
+    "periodo": {
+      "inicio_mes": "2026-09-01",
+      "fim_mes": "2026-09-30",
+      "atualizado_em": "2026-09-11T12:00:00Z"
+    }
+  }
+}
 
-```text
+41.1 Entregas antigas no Dashboard
+
+proximas_entregas pode conter:
+
+id
+numero_pedido
+cliente_nome
+endereco
+status
+prioridade
+regiao
+total_itens
+criada_em
+
+Essas informações permitem destacar pedidos antigos que continuam sem programação adequada.
+
+41.2 Pendências em atenção
+
+pendencias_atencao pode conter:
+
+id
+entrega_id
+numero_pedido
+cliente_nome
+produto
+saldo_pendente
+regiao
+data_abertura
+dias_aberta
+
+42. Importação/OCR — gerar prévia
+
+POST /api/documentos/importar-preview
+
+Recebe foto(s) ou PDF e retorna uma prévia editável.
+
+Content-Type
+
+multipart/form-data
+
+Campo atual
+
+arquivos[]
+
+O campo legado:
+
+arquivo
+
+continua aceito por compatibilidade.
+
+42.1 Arquivos aceitos
+
+Extensões:
+
+jpg
+jpeg
+png
+webp
+pdf
+
+Cada arquivo:
+
+máximo 12 MB
+
+Conjunto:
+
+máximo 40 MB
+
+Quantidade:
+
+1 até 12 arquivos
+
+Não é permitido misturar:
+
+PDF + imagens
+
+na mesma importação.
+
+O fluxo de PDF suporta atualmente até 12 páginas.
+
+42.2 Múltiplas fotos
+
+As imagens são tratadas na ordem enviada:
+
+topo
+↓
+meio
+↓
+final
+
+Todas representam um único documento e uma única entrega.
+
+42.3 Resposta
+
+201 Created
+
+Exemplo conceitual:
+
+{
+  "data": {
+    "documento": {
+      "id": 25,
+      "nome_arquivo": "nota.pdf",
+      "tipo_arquivo": "PDF",
+      "quantidade_arquivos": 1,
+      "status": "AGUARDANDO_CONFIRMACAO"
+    },
+    "dados": {
+      "numero_pedido": "89567",
+      "data_documento": null,
+      "cliente": {
+        "codigo_externo": null,
+        "nome": "João",
+        "apelido": null,
+        "telefone": null
+      },
+      "endereco": "Rua A",
+      "referencia": null,
+      "prioridade": "NORMAL",
+      "observacao": null,
+      "itens": [],
+      "avisos": []
+    },
+    "sugestoes": {
+      "cliente": null,
+      "regiao": null,
+      "pedido_ja_existe": false
+    }
+  }
+}
+
+42.4 Avisos de sobreposição
+
+Quando várias fotos possuem conteúdo repetido, o sistema pode adicionar aviso em:
+
+dados.avisos
+
+A aplicação não remove automaticamente itens idênticos, pois linhas iguais podem ser legítimas.
+
+43. Importação/OCR — confirmar
+
+POST /api/documentos/{documentoId}/confirmar
+
+Confirma a prévia revisada e cria a entrega definitiva.
+
+Payload
+
+{
+  "numero_pedido": "89567",
+  "cliente_id": null,
+  "cliente": {
+    "codigo_externo": null,
+    "nome": "João",
+    "apelido": null,
+    "telefone": null
+  },
+  "regiao_id": 2,
+  "endereco": "Rua A",
+  "referencia": null,
+  "prioridade": "NORMAL",
+  "observacao": null,
+  "itens": [
+    {
+      "codigo_produto": "148",
+      "descricao_produto": "Argamassa AC3",
+      "unidade": "UN",
+      "quantidade_solicitada": 50,
+      "observacao": null
+    }
+  ]
+}
+
+Regras principais
+
+numero_pedido:
+
+obrigatório
+máximo 80
+
+cliente_id:
+
+opcional
+exists:clientes,id
+
+cliente.nome:
+
+obrigatório
+máximo 180
+
+regiao_id:
+
+obrigatório
+exists:regiaos,id
+
+endereco:
+
+obrigatório
+máximo 500
+
+prioridade:
+
+BAIXA
+NORMAL
+ALTA
+URGENTE
+
+itens:
+
+obrigatório
+mínimo 1
+
+quantidade_solicitada:
+
+numeric
+> 0
+
+Resposta
+
+201 Created
+
+Exemplo:
+
+{
+  "data": {
+    "entrega_id": 100,
+    "numero_pedido": "89567",
+    "status": "PENDENTE"
+  }
+}
+
+44. Relatórios
+
+GET /api/relatorios
+
+Gera relatório operacional consolidado.
+
+Query parameters obrigatórios
+
+inicio
+fim
+
+Formato:
+
+YYYY-MM-DD
+
+Query parameters opcionais
+
+regiao_id
+status
+
+Exemplo
+
+GET /api/relatorios?inicio=2026-09-01&fim=2026-09-30
+
+Com filtros:
+
+GET /api/relatorios?inicio=2026-09-01&fim=2026-09-30&regiao_id=2&status=CONCLUIDA
+
+44.1 Validações de período
+
+fim precisa ser:
+
+>= inicio
+
+Período máximo:
+
+366 dias
+
+regiao_id precisa existir em:
+
+regiaos
+
+status precisa ser um estado válido de entrega.
+
+44.2 Timezone
+
+Os limites do período devem respeitar:
+
+APP_OPERATION_TIMEZONE=America/Fortaleza
+
+Datas locais são convertidas corretamente para consulta dos timestamps armazenados.
+
+44.3 Resposta do relatório
+
+Estrutura:
+
+{
+  "data": {
+    "periodo": {
+      "inicio": "2026-09-01",
+      "fim": "2026-09-30"
+    },
+    "filtros": {
+      "regiao_id": null,
+      "status": null
+    },
+    "opcoes": {
+      "regioes": []
+    },
+    "resumo": {
+      "total_entregas": 0,
+      "concluidas": 0,
+      "parciais": 0,
+      "nao_entregues": 0,
+      "canceladas": 0,
+      "pendencias_abertas": 0,
+      "pendencias_programadas": 0,
+      "quantidade_devolvida": 0
+    },
+    "entregas_por_status": [],
+    "entregas_por_regiao": [],
+    "pendencias": {
+      "total_criadas": 0,
+      "abertas": 0,
+      "programadas": 0,
+      "resolvidas": 0,
+      "canceladas": 0
+    },
+    "devolucoes": {
+      "quantidade_total": 0,
+      "registros": 0,
+      "por_motivo": []
+    },
+    "entregas_recentes": [],
+    "gerado_em": "2026-09-11T12:00:00Z"
+  }
+}
+
+45. Estados utilizados pela API
+
+45.1 Entrega
+
 PENDENTE
 PROGRAMADA
 EM_SAIDA
@@ -909,106 +1867,514 @@ PARCIAL
 CONCLUIDA
 NAO_ENTREGUE
 CANCELADA
-```
 
-## Carrada
+45.2 Prioridade
 
-```text
+BAIXA
+NORMAL
+ALTA
+URGENTE
+
+45.3 Carrada
+
 PLANEJADA
 EM_ANDAMENTO
 FINALIZADA
 CANCELADA
-```
 
-## Pendência
+45.4 Pendência
 
-```text
 ABERTA
 PROGRAMADA
 RESOLVIDA
 CANCELADA
-```
 
-## Resultado de tentativa
+45.5 Resultado de tentativa
 
-```text
 COMPLETA
 PARCIAL
 NAO_ENTREGUE
-```
 
-## Destino de quantidade não entregue
+45.6 Destino da quantidade não entregue
 
-```text
 REENTREGA
 DEVOLVIDO
-```
 
----
+45.7 Perfil de usuário
 
-# 28. Motivos de devolução
+ADMIN
+OPERADOR
 
-Códigos utilizados no contrato HTTP:
+46. Motivos de devolução
 
-| Código | Exibição sugerida |
-|---|---|
-| `CLIENTE_RECUSOU` | Cliente recusou |
-| `CLIENTE_DESISTIU` | Cliente desistiu |
-| `PRODUTO_INCORRETO` | Produto incorreto |
-| `PRODUTO_AVARIADO` | Produto avariado |
-| `QUANTIDADE_EXCEDENTE` | Quantidade excedente |
-| `OUTRO` | Outro |
+Código
 
----
+Exibição sugerida
 
-# 29. Fluxo principal pela API
+CLIENTE_RECUSOU
 
-```mermaid
+Cliente recusou
+
+CLIENTE_DESISTIU
+
+Cliente desistiu
+
+PRODUTO_INCORRETO
+
+Produto incorreto
+
+PRODUTO_AVARIADO
+
+Produto avariado
+
+QUANTIDADE_EXCEDENTE
+
+Quantidade excedente
+
+OUTRO
+
+Outro
+
+47. Resumo das rotas atuais
+
+Sessão
+
+Método
+
+Endpoint
+
+GET
+
+/sanctum/csrf-cookie
+
+POST
+
+/login
+
+POST
+
+/register
+
+POST
+
+/logout
+
+Usuário
+
+Método
+
+Endpoint
+
+GET
+
+/api/user
+
+GET
+
+/api/usuarios
+
+PUT
+
+/api/usuarios/{usuario}
+
+PUT
+
+/api/usuarios/{usuario}/senha
+
+Regiões
+
+Método
+
+Endpoint
+
+GET
+
+/api/regioes
+
+POST
+
+/api/regioes
+
+GET
+
+/api/regioes/{regiao}
+
+PUT/PATCH
+
+/api/regioes/{regiao}
+
+DELETE
+
+/api/regioes/{regiao}
+
+Clientes
+
+Método
+
+Endpoint
+
+GET
+
+/api/clientes
+
+POST
+
+/api/clientes
+
+GET
+
+/api/clientes/{cliente}
+
+PUT/PATCH
+
+/api/clientes/{cliente}
+
+DELETE
+
+/api/clientes/{cliente}
+
+GET
+
+/api/clientes/{cliente}/entregas
+
+Entregas
+
+Método
+
+Endpoint
+
+GET
+
+/api/entregas
+
+POST
+
+/api/entregas
+
+GET
+
+/api/entregas/{entrega}
+
+PUT/PATCH
+
+/api/entregas/{entrega}
+
+DELETE
+
+/api/entregas/{entrega}
+
+GET
+
+/api/entregas/{entrega}/historico
+
+GET
+
+/api/planejamento/entregas/{entrega}/itens-disponiveis
+
+Pendências
+
+Método
+
+Endpoint
+
+GET
+
+/api/pendencias
+
+POST
+
+/api/pendencias/{pendencia}/resolver-manualmente
+
+Veículos
+
+Método
+
+Endpoint
+
+GET
+
+/api/veiculos
+
+POST
+
+/api/veiculos
+
+GET
+
+/api/veiculos/{veiculo}
+
+PUT/PATCH
+
+/api/veiculos/{veiculo}
+
+DELETE
+
+/api/veiculos/{veiculo}
+
+Carradas
+
+Método
+
+Endpoint
+
+GET
+
+/api/saidas
+
+POST
+
+/api/saidas
+
+GET
+
+/api/saidas/{saida}
+
+GET
+
+/api/saidas/{saida}/entregas-disponiveis
+
+GET
+
+/api/saidas/{saida}/pendencias-disponiveis
+
+GET
+
+/api/saidas/{saida}/pendencias
+
+POST
+
+/api/saidas/{saida}/entregas
+
+DELETE
+
+/api/saidas/{saida}/entregas/{entrega}
+
+POST
+
+/api/saidas/{saida}/pendencias/{pendencia}
+
+DELETE
+
+/api/saidas/{saida}/pendencias/{pendencia}
+
+POST
+
+/api/saidas/{saida}/iniciar
+
+POST
+
+/api/saidas/{saida}/entregas/{entrega}/resultado
+
+POST
+
+/api/saidas/{saida}/pendencias/{pendencia}/resultado
+
+POST
+
+/api/saidas/{saida}/finalizar
+
+POST
+
+/api/saidas/{saida}/cancelar
+
+GET
+
+/api/saidas/{saida}/historico
+
+Dashboard
+
+Método
+
+Endpoint
+
+GET
+
+/api/dashboard
+
+Importação / OCR
+
+Método
+
+Endpoint
+
+POST
+
+/api/documentos/importar-preview
+
+POST
+
+/api/documentos/{documentoId}/confirmar
+
+Relatórios
+
+Método
+
+Endpoint
+
+GET
+
+/api/relatorios
+
+48. Fluxo operacional principal pela API
+
 sequenceDiagram
     participant F as Frontend
     participant A as API
 
-    F->>A: POST /saidas
+    F->>A: GET /sanctum/csrf-cookie
+    F->>A: POST /login
+    A-->>F: Sessão
+
+    F->>A: GET /api/entregas
+    A-->>F: Entregas
+
+    F->>A: POST /api/saidas
     A-->>F: Carrada criada
 
-    F->>A: GET /saidas/{id}/entregas-disponiveis
-    A-->>F: Entregas normais
+    F->>A: GET /api/saidas/{id}/entregas-disponiveis
+    A-->>F: Entregas disponíveis
 
-    F->>A: GET /saidas/{id}/pendencias-disponiveis
-    A-->>F: Reentregas
+    F->>A: GET /api/saidas/{id}/pendencias-disponiveis
+    A-->>F: Reentregas disponíveis
 
-    F->>A: POST /saidas/{id}/entregas
-    A-->>F: Carrada atualizada
+    F->>A: POST /api/saidas/{id}/entregas
+    A-->>F: Entrega adicionada
 
-    F->>A: POST /saidas/{id}/pendencias/{pendencia}
-    A-->>F: 204
+    F->>A: POST /api/saidas/{id}/pendencias/{pendencia}
+    A-->>F: Reentrega programada
 
-    F->>A: POST /saidas/{id}/iniciar
-    A-->>F: EM_ANDAMENTO
+    F->>A: POST /api/saidas/{id}/iniciar
+    A-->>F: Carrada EM_ANDAMENTO
 
-    F->>A: POST /saidas/{id}/entregas/{entrega}/resultado
-    A-->>F: Tentativa
+    F->>A: POST /api/saidas/{id}/entregas/{entrega}/resultado
+    A-->>F: Resultado normal
 
-    F->>A: POST /saidas/{id}/pendencias/{pendencia}/resultado
-    A-->>F: Retorno de reentrega
+    F->>A: POST /api/saidas/{id}/pendencias/{pendencia}/resultado
+    A-->>F: Resultado da reentrega
 
-    F->>A: POST /saidas/{id}/finalizar
-    A-->>F: FINALIZADA
-```
+    F->>A: POST /api/saidas/{id}/finalizar
+    A-->>F: Carrada FINALIZADA
 
----
+49. Fluxo de importação pela API
 
-# 30. Regras para novos endpoints
+sequenceDiagram
+    participant F as Frontend
+    participant A as API
+    participant O as OCR
 
-Ao criar novos endpoints, manter estas convenções:
+    F->>A: POST /api/documentos/importar-preview
+    A->>O: processar documento
+    O-->>A: texto/dados extraídos
+    A-->>F: prévia editável
 
-- usar prefixo `/api`;
-- proteger operação privada com `auth:sanctum`;
-- utilizar Form Request para payload relevante;
-- validar IDs relacionados;
-- deixar regra de negócio em Service;
-- retornar Resource quando representar uma entidade;
-- retornar JSON explícito para operações específicas;
-- utilizar códigos HTTP coerentes;
-- não duplicar cálculo crítico no Controller;
-- documentar o endpoint neste arquivo.
+    F->>F: usuário confere/corrige
+
+    F->>A: POST /api/documentos/{id}/confirmar
+    A-->>F: entrega criada
+
+50. Fluxo administrativo de usuários
+
+sequenceDiagram
+    participant A as ADMIN
+    participant API as Backend
+
+    A->>API: GET /api/usuarios
+    API-->>A: usuários
+
+    A->>API: POST /register
+    API-->>A: operador criado
+
+    A->>API: PUT /api/usuarios/{id}
+    API-->>A: usuário atualizado
+
+    A->>API: PUT /api/usuarios/{id}/senha
+    API-->>A: senha redefinida
+
+51. Códigos HTTP utilizados
+
+Os principais códigos utilizados ou esperados no projeto são:
+
+200 OK
+201 Created
+204 No Content
+401 Unauthorized
+403 Forbidden
+404 Not Found
+422 Unprocessable Entity
+
+Uso conceitual:
+
+200
+→ consulta ou alteração com corpo de resposta
+
+201
+→ criação
+
+204
+→ operação concluída sem conteúdo
+
+401
+→ sem autenticação
+
+403
+→ autenticado sem autorização
+
+404
+→ recurso não encontrado
+
+422
+→ validação/regra de entrada não atendida
+
+52. Regras para criação de novos endpoints
+
+Ao adicionar novos endpoints:
+
+utilizar /api para operações da API;
+
+proteger rotas privadas com auth:sanctum;
+
+aplicar bloqueio de usuário inativo;
+
+validar autorização de perfil no backend;
+
+utilizar Form Request quando houver payload relevante;
+
+validar IDs relacionados;
+
+manter regras críticas em Services;
+
+utilizar Resource quando o retorno representar entidade;
+
+utilizar JSON explícito para operações específicas quando apropriado;
+
+utilizar códigos HTTP coerentes;
+
+evitar duplicar cálculos críticos em Controller;
+
+atualizar Types TypeScript;
+
+atualizar Service HTTP do frontend;
+
+adicionar testes quando houver regra importante;
+
+documentar o endpoint neste arquivo.
+
+53. Regra de manutenção
+
+Quando uma rota for:
+
+criada;
+
+removida;
+
+renomeada;
+
+tiver payload alterado;
+
+tiver resposta alterada;
+
+receber nova regra de autorização;
+
+este documento deve ser revisado.
+
+A API é o contrato entre frontend e backend e não deve evoluir silenciosamente sem atualização da documentação.

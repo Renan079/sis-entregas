@@ -20,9 +20,14 @@ O foco principal é permitir que a loja controle:
 - pendências e reentregas;
 - devoluções;
 - histórico do pedido;
-- histórico da carrada.
+- histórico da carrada;
+- clientes e regiões utilizados na operação;
+- usuários responsáveis pelas operações do sistema;
+- importação de pedidos por foto ou PDF;
+- visão operacional por dashboard;
+- relatórios para acompanhamento da operação.
 
-O sistema não depende, neste momento, de integração direta com o ERP ou sistema comercial da loja.
+O sistema não depende, neste momento, de integração direta com o ERP ou sistema comercial da loja. Quando necessário, os dados das entregas podem ser cadastrados manualmente ou importados a partir de documentos digitalizados.
 
 ---
 
@@ -37,9 +42,12 @@ O processo manual apresenta problemas como:
 - dificuldade de saber em qual carrada um pedido foi enviado;
 - falta de histórico confiável;
 - dificuldade de visualizar entregas por região;
-- dificuldade de reorganizar entregas quando existe falta de motorista ou problema em veículo.
+- dificuldade de identificar pedidos antigos que ainda aguardam atendimento;
+- dificuldade de reorganizar entregas quando existe falta de motorista ou problema em veículo;
+- retrabalho ao transcrever dados de pedidos para o controle logístico;
+- falta de uma visão consolidada da situação das entregas do dia e das pendências em aberto.
 
-O sistema centraliza essas informações.
+O sistema centraliza essas informações e permite que a operação seja acompanhada com maior clareza e rastreabilidade.
 
 ---
 
@@ -47,17 +55,42 @@ O sistema centraliza essas informações.
 
 Permitir que a loja saiba, a qualquer momento:
 
-> O que precisa ser entregue, o que já foi enviado, o que foi realmente entregue, o que voltou para reentrega, o que foi devolvido e em qual carrada cada operação aconteceu.
+> O que precisa ser entregue, o que já foi programado, o que já saiu da loja, o que foi realmente entregue, o que voltou para reentrega, o que foi devolvido e em qual carrada cada operação aconteceu.
+
+Além disso, o sistema deve ajudar o responsável pela logística a identificar rapidamente quais pedidos precisam de maior atenção, incluindo entregas antigas, pendências abertas e carradas ainda não concluídas.
 
 ---
 
-## 5. Usuário principal
+## 5. Usuários do sistema
 
-O sistema é voltado inicialmente para o operador responsável pela organização das entregas da loja.
+O sistema é voltado inicialmente para os funcionários responsáveis pela organização e acompanhamento das entregas da loja.
 
-Esse usuário pode:
+Existem atualmente dois perfis de acesso:
 
-- cadastrar entregas;
+### 5.1 ADMIN
+
+O administrador possui acesso às funções operacionais e também à gestão de usuários.
+
+Pode, entre outras operações:
+
+- consultar e operar entregas;
+- organizar carradas;
+- acompanhar pendências e reentregas;
+- consultar dashboard e relatórios;
+- cadastrar novos usuários;
+- editar usuários;
+- alterar perfil de acesso;
+- ativar ou desativar usuários;
+- redefinir senhas.
+
+### 5.2 OPERADOR
+
+O operador utiliza as funções necessárias para o trabalho diário da logística, sem acesso às operações administrativas de gestão de usuários.
+
+Entre as principais atividades operacionais estão:
+
+- cadastrar e editar entregas;
+- importar pedidos;
 - organizar carradas;
 - definir rotas;
 - escolher produtos e quantidades que irão em cada carrada;
@@ -65,7 +98,10 @@ Esse usuário pode:
 - registrar retornos;
 - registrar reentregas;
 - registrar devoluções;
-- consultar históricos.
+- consultar históricos;
+- acompanhar dashboard, pendências e informações operacionais disponíveis ao seu perfil.
+
+Usuários desativados não devem conseguir acessar o sistema.
 
 ---
 
@@ -82,6 +118,8 @@ Exemplo:
 - Pedido: 100 blocos;
 - Carrada 1: 55 blocos;
 - Carrada 2: 45 blocos.
+
+A entrega também mantém sua data de lançamento no sistema, permitindo identificar pedidos mais antigos e dar atenção àqueles que estão aguardando há mais tempo.
 
 ---
 
@@ -161,6 +199,38 @@ Uma devolução não gera nova pendência.
 
 ---
 
+### 6.7 Documento importado
+
+Representa um arquivo utilizado para auxiliar a criação de uma entrega.
+
+O sistema permite trabalhar com:
+
+- foto;
+- conjunto ordenado de fotos;
+- PDF com uma ou várias páginas.
+
+O documento é processado por OCR e os dados encontrados são apresentados para conferência antes da criação definitiva da entrega.
+
+A importação tem como objetivo reduzir digitação manual, mas não elimina a validação humana, pois os dados extraídos podem precisar de correção.
+
+---
+
+### 6.8 Cliente
+
+Representa o cadastro reutilizável do comprador ou destinatário da entrega.
+
+Uma entrega mantém também os dados necessários ao contexto operacional para que seu histórico continue compreensível mesmo que o cadastro do cliente seja alterado posteriormente.
+
+---
+
+### 6.9 Região
+
+Representa uma área utilizada para organizar entregas e auxiliar a montagem de rotas e carradas.
+
+As regiões permitem agrupar pedidos que podem ser atendidos dentro de um mesmo percurso.
+
+---
+
 ## 7. Estados importantes do fluxo
 
 ### Entrega
@@ -208,7 +278,9 @@ Ele diferencia:
 - quantidade em carrada;
 - quantidade ainda não enviada.
 
-Isso permite representar situações reais da operação.
+Isso permite representar situações reais da operação e evita que uma mesma quantidade seja programada duas vezes.
+
+Outro diferencial é a rastreabilidade. Entregas, carradas, tentativas, pendências, reentregas, devoluções e eventos relevantes possuem histórico suficiente para explicar como a operação chegou ao estado atual.
 
 ---
 
@@ -251,37 +323,118 @@ Resultado final:
 
 ## 10. Escopo atual
 
-O núcleo atualmente trabalhado cobre:
+O produto atualmente cobre os seguintes módulos e fluxos:
 
-- cadastro de entregas;
-- itens da entrega;
+### Acesso e usuários
+
+- login e logout;
+- autenticação por sessão com Laravel Sanctum;
+- usuários ativos e inativos;
+- perfis `ADMIN` e `OPERADOR`;
+- cadastro de usuários por administrador;
+- listagem e edição de usuários;
+- alteração de perfil;
+- ativação e desativação;
+- redefinição de senha.
+
+### Cadastros operacionais
+
+- clientes;
+- histórico de clientes;
 - regiões;
-- veículos;
-- carradas;
-- rota ordenada;
+- veículos utilizados na operação.
+
+### Entregas
+
+- cadastro manual de entregas;
+- importação de entregas por documento;
+- itens da entrega;
+- prioridade;
+- status;
+- edição e cancelamento conforme regras de negócio;
+- data de lançamento;
+- ordenação por entregas mais antigas ou mais recentes;
 - divisão de itens entre carradas;
 - saldo disponível para programação;
-- retorno da entrega;
-- pendências;
-- reentregas;
-- devoluções;
-- histórico da entrega;
+- histórico da entrega.
+
+### Carradas
+
+- criação de carradas;
+- rota ordenada;
+- seleção de veículo;
+- associação de entregas;
+- associação de reentregas;
+- programação parcial de produtos;
+- início da carrada;
+- registro de retornos;
+- finalização e cancelamento conforme regras de negócio;
 - histórico da carrada;
 - eventos da carrada.
+
+### Pendências e devoluções
+
+- criação de pendências a partir do retorno;
+- programação de reentrega;
+- retorno de reentrega;
+- resolução parcial ou total;
+- devoluções;
+- histórico e movimentações relacionadas.
+
+### Importação e OCR
+
+- importação de foto;
+- importação de múltiplas fotos ordenadas;
+- importação de PDF com múltiplas páginas;
+- extração de dados por OCR;
+- conferência e edição antes da confirmação;
+- criação ou reaproveitamento de cliente durante o fluxo de importação;
+- criação da entrega a partir dos dados confirmados.
+
+### Dashboard
+
+- entregas realizadas no mês;
+- pedidos aguardando carrada;
+- carradas do dia;
+- reentregas abertas;
+- pedidos com problema;
+- volume por região;
+- pendências mais antigas;
+- pedidos antigos ainda sem carrada;
+- visão rápida da situação operacional.
+
+### Relatórios
+
+O sistema já possui um módulo inicial de relatórios para acompanhamento da operação, que continua em evolução e refinamento conforme novas necessidades forem identificadas.
 
 ---
 
 ## 11. Evoluções futuras
 
-Funcionalidades planejadas para etapas posteriores incluem:
+Funcionalidades que podem ser desenvolvidas ou ampliadas em etapas posteriores incluem:
 
-- importação de notas por foto ou PDF;
-- OCR;
-- dashboard operacional;
-- indicadores;
-- relatórios;
-- gestão visual de equipe;
-- ocorrências operacionais;
+- gestão visual mais completa de equipe por carrada;
+- tratamento mais amplo de ocorrências operacionais;
+- reprogramação assistida em casos de falta de motorista ou indisponibilidade de veículo;
 - planejamento mais avançado de rotas;
-- análise de custos de reentrega;
-- integração com outros sistemas, caso exista API disponível.
+- análise de custo de reentrega;
+- indicadores gerenciais adicionais;
+- ampliação do módulo de relatórios;
+- notificações e alertas operacionais;
+- integração com outros sistemas, caso exista API disponível;
+- automações adicionais para reduzir ainda mais a digitação manual.
+
+---
+
+## 12. Direção do produto
+
+O sistema deve continuar evoluindo com foco em três princípios:
+
+1. **Representar a operação real da loja**  
+   O sistema deve se adaptar ao modo como as entregas realmente acontecem, incluindo divisões, faltas, reentregas, devoluções e imprevistos.
+
+2. **Preservar rastreabilidade**  
+   Alterações relevantes devem deixar informações suficientes para que seja possível entender quem fez determinada operação, quando ela aconteceu e qual foi o resultado.
+
+3. **Facilitar a decisão operacional**  
+   A interface deve ajudar o responsável a perceber rapidamente o que está atrasado, pendente, programado, em andamento ou concluído, reduzindo a dependência de memória, papel e conferências manuais.

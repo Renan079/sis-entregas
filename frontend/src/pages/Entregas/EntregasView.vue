@@ -33,6 +33,7 @@ const filtros = reactive({
   regiao_id: null as number | null,
   status: '' as StatusEntrega | '',
   prioridade: '' as PrioridadeEntrega | '',
+  ordem: 'antigas' as 'antigas' | 'recentes',
 })
 
 async function carregarEntregas(page = 1) {
@@ -45,6 +46,7 @@ async function carregarEntregas(page = 1) {
       regiao_id: filtros.regiao_id,
       status: filtros.status,
       prioridade: filtros.prioridade,
+      ordem: filtros.ordem,
       page,
     })
 
@@ -138,6 +140,7 @@ function limparFiltros() {
   filtros.regiao_id = null
   filtros.status = ''
   filtros.prioridade = ''
+  filtros.ordem = 'antigas'
 
   carregarEntregas(1)
 }
@@ -165,6 +168,75 @@ function prioridadeLabel(prioridade: PrioridadeEntrega) {
   }
 
   return labels[prioridade]
+}
+
+function formatarDataLancamento(data: string) {
+  const valor = new Date(data)
+
+  if (Number.isNaN(valor.getTime())) {
+    return data
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+  }).format(valor)
+}
+
+function formatarHoraLancamento(data: string) {
+  const valor = new Date(data)
+
+  if (Number.isNaN(valor.getTime())) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(valor)
+}
+
+function tempoDesdeLancamento(data: string) {
+  const lancamento = new Date(data)
+
+  if (Number.isNaN(lancamento.getTime())) {
+    return ''
+  }
+
+  const hoje = new Date()
+
+  const inicioHoje = new Date(
+    hoje.getFullYear(),
+    hoje.getMonth(),
+    hoje.getDate(),
+  )
+
+  const inicioLancamento = new Date(
+    lancamento.getFullYear(),
+    lancamento.getMonth(),
+    lancamento.getDate(),
+  )
+
+  const diferenca = Math.max(
+    0,
+    Math.round(
+      (inicioHoje.getTime() - inicioLancamento.getTime()) /
+        86_400_000,
+    ),
+  )
+
+  if (diferenca === 0) {
+    return 'Hoje'
+  }
+
+  if (diferenca === 1) {
+    return 'Há 1 dia'
+  }
+
+  return `Há ${diferenca} dias`
+}
+
+function entregaEmAberto(entrega: Entrega) {
+  return !['CONCLUIDA', 'CANCELADA'].includes(entrega.status)
 }
 
 onMounted(async () => {
@@ -276,6 +348,23 @@ onMounted(async () => {
         <strong>
           {{ total }} entrega(s)
         </strong>
+
+        <label class="ordenacao-entregas">
+          <span>Ordenar:</span>
+
+          <select
+            v-model="filtros.ordem"
+            @change="carregarEntregas(1)"
+          >
+            <option value="antigas">
+              Mais antigas primeiro
+            </option>
+
+            <option value="recentes">
+              Mais recentes primeiro
+            </option>
+          </select>
+        </label>
       </div>
 
       <div
@@ -300,6 +389,7 @@ onMounted(async () => {
           <thead>
             <tr>
               <th>Pedido</th>
+              <th>Lançada em</th>
               <th>Cliente</th>
               <th>Região</th>
               <th>Endereço</th>
@@ -322,6 +412,23 @@ onMounted(async () => {
                 <strong>
                   {{ entrega.numero_pedido || `#${entrega.id}` }}
                 </strong>
+              </td>
+
+              <td class="data-lancamento">
+                <strong>
+                  {{ formatarDataLancamento(entrega.created_at) }}
+                </strong>
+
+                <small>
+                  {{ formatarHoraLancamento(entrega.created_at) }}
+                </small>
+
+                <span
+                  v-if="entregaEmAberto(entrega)"
+                  class="tempo-lancamento"
+                >
+                  {{ tempoDesdeLancamento(entrega.created_at) }}
+                </span>
               </td>
 
               <td>

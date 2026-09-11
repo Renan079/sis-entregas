@@ -17,6 +17,8 @@ import SaidaHistoricoView from '@/pages/Saidas/SaidaHistoricoView.vue'
 import EntregaHistoricoView from '@/pages/Entregas/EntregaHistoricoView.vue'
 import EntregaFormularioView from '@/pages/Entregas/EntregaFormularioView.vue'
 import ClienteHistoricoView from '@/pages/Clientes/ClienteHistoricoView.vue'
+import UsuariosView from '@/pages/Usuarios/UsuariosView.vue'
+import UsuarioNovoView from '@/pages/Usuarios/UsuarioNovoView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -61,6 +63,24 @@ const router = createRouter({
           path: 'regioes',
           name: 'regioes',
           component: RegioesView,
+        },
+
+        {
+          path: 'usuarios',
+          name: 'usuarios',
+          component: UsuariosView,
+          meta: {
+            requiresAdmin: true,
+          },
+        },
+
+        {
+          path: 'usuarios/novo',
+          name: 'usuario-novo',
+          component: UsuarioNovoView,
+          meta: {
+            requiresAdmin: true,
+          },
         },
 
         {
@@ -131,6 +151,12 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.user) {
     return {
       name: 'login',
+    }
+  }
+
+  if (to.meta.requiresAdmin && auth.user?.perfil !== 'ADMIN') {
+    return {
+      name: 'dashboard',
     }
   }
 
