@@ -492,60 +492,6 @@ RF-049 — Redefinir senha de usuário
 
 Usuários administradores devem poder redefinir a senha de um usuário.
 
-2.8 Importação de documentos e OCR
-
-RF-050 — Importar entrega por imagem
-
-O sistema deve permitir importar documento de entrega a partir de imagem compatível.
-
-RF-051 — Importar múltiplas imagens
-
-O sistema deve permitir importar várias imagens pertencentes ao mesmo documento, mantendo a ordem informada pelo usuário.
-
-O fluxo atual suporta até 12 imagens por importação.
-
-RF-052 — Importar documento PDF
-
-O sistema deve permitir importar documento em PDF.
-
-O fluxo atual suporta documentos de até 12 páginas por importação.
-
-RF-053 — Extrair dados por OCR
-
-O sistema deve processar o documento importado e tentar extrair informações relevantes da entrega, como:
-
-número do pedido;
-
-cliente;
-
-endereço;
-
-produtos;
-
-códigos;
-
-unidades;
-
-quantidades.
-
-RF-054 — Exigir conferência antes da confirmação
-
-Dados extraídos automaticamente não devem criar uma entrega definitiva sem conferência do usuário.
-
-O usuário deve poder revisar e corrigir os campos antes de confirmar.
-
-RF-055 — Criar ou reutilizar cliente na importação
-
-Durante a confirmação da importação, o sistema deve permitir utilizar um cliente existente ou criar o cadastro necessário de acordo com os dados confirmados.
-
-RF-056 — Preservar documento importado
-
-O sistema deve manter registro do documento utilizado na importação, incluindo informações necessárias para rastreabilidade do processamento.
-
-RF-057 — Identificar possíveis sobreposições entre páginas
-
-Quando o processamento de múltiplas imagens ou páginas detectar conteúdo potencialmente repetido entre partes do documento, o sistema deve apresentar aviso para conferência, evitando criação incorreta de itens duplicados.
-
 2.9 Dashboard
 
 RF-058 — Exibir visão operacional
@@ -715,12 +661,6 @@ Mudanças relevantes da API devem ser refletidas nos contratos do frontend.
 RNF-012 — Tratamento de datas e fuso horário
 
 Operações sensíveis a períodos de tempo devem utilizar de forma consistente o fuso horário operacional configurado.
-
-RNF-013 — Confiabilidade da importação
-
-OCR deve ser tratado como mecanismo de auxílio e não como fonte infalível.
-
-Dados extraídos automaticamente devem permanecer editáveis antes da confirmação.
 
 RNF-014 — Preservação histórica
 

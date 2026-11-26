@@ -96,7 +96,7 @@ Todos os dados operacionais ficam concentrados em dois locais físicos dentro da
 
     Banco de dados: ./dados_producao/postgres
 
-    Arquivos/Fotos importadas (OCR): ./dados_producao/storage
+    Storage da aplicação: ./dados_producao/storage
 
 5.1 Backup Diário (backup.sh / backup.bat)
 
@@ -160,8 +160,7 @@ Comandos úteis para verificação técnica na pasta raiz do sistema:
 
     docker compose -f docker-compose.prod.yml ps
 
-    Visualizar logs do backend (Laravel / OCR):
-    Bash
+    logs do backend (Laravel)
 
     docker compose -f docker-compose.prod.yml logs -f app
 

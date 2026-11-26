@@ -18,8 +18,6 @@ entidades de histórico;
 
 entidades de autenticação;
 
-entidades de importação e OCR;
-
 entidades utilizadas em entregas, carradas, pendências, reentregas e devoluções;
 
 cálculos derivados do modelo;
@@ -49,10 +47,6 @@ regiaos;
 funcionarios;
 
 veiculos.
-
-2.3 Importação
-
-documento_importados.
 
 2.4 Entregas
 
@@ -98,10 +92,9 @@ ocorrencias_operacionais.
 
 3. Diagrama geral
 
-erDiagram
+  Diagram
     USERS ||--o{ ENTREGAS : cria
     USERS ||--o{ SAIDAS : cria
-    USERS ||--o{ DOCUMENTO_IMPORTADOS : importa
     USERS ||--o{ PENDENCIA_MOVIMENTACOES : registra
     USERS ||--o{ DEVOLUCOES : registra
     USERS ||--o{ SAIDA_PENDENCIA_RETORNOS : registra
@@ -112,8 +105,6 @@ erDiagram
     REGIAOS ||--o{ ENTREGAS : agrupa
     REGIAOS ||--o{ SAIDAS : principal
     VEICULOS ||--o{ SAIDAS : utilizado_em
-
-    DOCUMENTO_IMPORTADOS ||--o| ENTREGAS : pode_originar
 
     ENTREGAS ||--|{ ENTREGA_ITEMS : possui
     ENTREGAS ||--o{ ENTREGA_EVENTOS : historico
@@ -217,7 +208,6 @@ Relacionamentos relevantes:
 
 users 1 ─── N entregas
 users 1 ─── N saidas
-users 1 ─── N documento_importados
 users 1 ─── N pendencia_movimentacoes
 users 1 ─── N devolucoes
 users 1 ─── N eventos
@@ -396,102 +386,6 @@ veiculos 1 ─── N saidas
 
 Uma troca de veículo em uma carrada não deve recriar a entrega ou alterar suas quantidades.
 
-6. Importação de documentos
-
-6.1 documento_importados
-
-Registra documentos enviados para processamento e OCR.
-
-Diferentemente das versões anteriores da documentação, esta entidade já faz parte do fluxo atual do sistema.
-
-Campos conhecidos:
-
-Campo
-
-Função
-
-id
-
-identificador
-
-usuario_id
-
-usuário que realizou a importação
-
-tipo_arquivo
-
-tipo do arquivo
-
-nome_arquivo
-
-nome do arquivo
-
-arquivo_path
-
-localização armazenada
-
-hash_sha256
-
-hash para rastreabilidade/identificação
-
-status
-
-estado do processamento
-
-texto_extraido
-
-texto resultante do OCR
-
-dados_extraidos
-
-representação estruturada, quando disponível
-
-erro_processamento
-
-informação de falha, quando existir
-
-created_at
-
-momento da importação
-
-Relacionamentos conceituais:
-
-users 1 ─── N documento_importados
-
-documento_importados 1 ─── 0..1 entregas
-
-A entrega pode possuir:
-
-documento_importado_id
-
-para manter vínculo com sua origem.
-
-6.2 Função histórica do documento
-
-O documento importado não deve existir apenas como arquivo temporário sem contexto.
-
-Ele permite rastrear:
-
-arquivo recebido
-→ texto extraído
-→ dados interpretados
-→ conferência
-→ entrega gerada
-
-6.3 OCR não substitui os dados confirmados
-
-texto_extraido e dados_extraidos representam resultado automático.
-
-A entrega definitiva representa os dados confirmados pelo operador.
-
-Portanto:
-
-resultado OCR
-!=
-verdade definitiva da entrega
-
-O usuário pode corrigir a prévia antes da criação.
-
 7. Entregas
 
 7.1 entregas
@@ -511,8 +405,6 @@ identificador interno
 numero_pedido
 
 número do pedido externo
-
-documento_importado_id
 
 documento de origem, quando existir
 
@@ -704,7 +596,7 @@ quando a operação estiver trabalhando diretamente com entrega_items.
 
 No escopo atual, entrega_items não depende de um cadastro central com todos os produtos da loja.
 
-Isso permite importar diretamente itens presentes na nota/documento.
+Isso permite cadastrar livremente os itens presentes no pedido.
 
 O item conserva:
 
@@ -1662,19 +1554,6 @@ flowchart TD
     J -->|Sim + REENTREGA| F
     J -->|Sim + DEVOLVIDO| G
 
-27. Relação da importação com a entrega
-
-flowchart LR
-    A[documento_importados] --> B[texto_extraido]
-    B --> C[dados_extraidos]
-    C --> D[conferência do usuário]
-    D --> E[entregas]
-    E --> F[entrega_items]
-
-O documento mantém a origem.
-
-A entrega mantém os dados operacionais definitivos.
-
 28. Relação entre autenticação e auditoria
 
 flowchart TD
@@ -1834,13 +1713,10 @@ Consultas por período devem respeitar essa configuração.
 User
 ├── cria Entregas
 ├── cria Carradas
-├── importa Documentos
 ├── registra Movimentações
 ├── registra Devoluções
 └── aparece em Eventos
 
-Documento importado
-└── pode originar Entrega
 
 Cliente
 └── Entregas
@@ -1896,12 +1772,11 @@ clientes
 regiaos
 funcionarios
 veiculos
-documento_importados
 ocorrencias_operacionais
 
 35. Ciclo representado pelo modelo
 
-DOCUMENTO / CADASTRO MANUAL
+CADASTRO MANUAL / INTEGRAÇÃO EXTERNA
           ↓
         ENTREGA
           ↓

@@ -38,7 +38,7 @@ return new class extends Migration
                 'ERRO',
             ])->default('ENVIADO');
 
-            // Texto bruto retornado pelo OCR
+            
             $table->text('texto_extraido')
                 ->nullable();
 

@@ -1,6 +1,6 @@
 FROM php:8.3-fpm-bookworm
 
-# Instala dependências do sistema, extensões PHP e ferramentas de OCR (Tesseract, Poppler, ImageMagick)
+# Instala dependências do sistema, extensões PHP e ferramentas
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
@@ -24,11 +24,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Ajusta política do ImageMagick para permitir leitura/conversão de PDFs se necessário
-RUN if [ -f /etc/ImageMagick-6/policy.xml ]; then \
-        sed -i 's/rights="none" pattern="PDF"/rights="read|write" pattern="PDF"/' /etc/ImageMagick-6/policy.xml; \
-    fi
-
 # Copia o Composer oficial
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
@@ -46,8 +41,8 @@ RUN rm -f bootstrap/cache/*.php
 # Gera autoloader otimizado
 RUN composer dump-autoload --optimize --no-dev
 
-# Configura limites de upload do PHP para comportar documentos OCR (até 40MB)
-RUN echo "upload_max_filesize = 50M\npost_max_size = 55M\nmemory_limit = 512M\nmax_execution_time = 120" > /usr/local/etc/php/conf.d/uploads.ini
+# Configura limites padrão do PHP
+RUN echo "upload_max_filesize = 10M\npost_max_size = 12M\nmemory_limit = 256M\nmax_execution_time = 60" > /usr/local/etc/php/conf.d/uploads.ini
 
 # Copia e habilita o entrypoint
 COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh

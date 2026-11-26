@@ -49,7 +49,7 @@ Ao final do processo, confirme com docker images se as três imagens necessária
 
     sistema-entregas-nginx:1.0 (Frontend compilado + Nginx)
 
-    sistema-entregas-app:1.0 (Laravel 12 + PHP 8.3-FPM + OCR)
+    sistema-entregas-app:1.0 (Laravel 12 + PHP 8.3-FPM)
 
     postgres:17-alpine (Banco de dados PostgreSQL 17)
 
@@ -64,7 +64,7 @@ docker save -o sistema-entregas-v1.0.tar \
   sistema-entregas-app:1.0 \
   postgres:17-alpine
 
-Esse comando gera o arquivo sistema-entregas-v1.0.tar na raiz do projeto, contendo todo o sistema operacional dos containers, PHP, Tesseract, Node compilado e PostgreSQL.
+Esse comando gera o arquivo sistema-entregas-v1.0.tar na raiz do projeto, contendo todo o sistema operacional dos containers, PHP, Node compilado e PostgreSQL.
 6. Montagem da Pasta de Entrega (Pendrive)
 
 Crie uma pasta limpa (por exemplo, Pacote_Instalacao_Entregas/) e organize exatamente os seguintes arquivos para copiar ao pendrive:

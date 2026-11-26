@@ -199,22 +199,6 @@ Uma devolução não gera nova pendência.
 
 ---
 
-### 6.7 Documento importado
-
-Representa um arquivo utilizado para auxiliar a criação de uma entrega.
-
-O sistema permite trabalhar com:
-
-- foto;
-- conjunto ordenado de fotos;
-- PDF com uma ou várias páginas.
-
-O documento é processado por OCR e os dados encontrados são apresentados para conferência antes da criação definitiva da entrega.
-
-A importação tem como objetivo reduzir digitação manual, mas não elimina a validação humana, pois os dados extraídos podem precisar de correção.
-
----
-
 ### 6.8 Cliente
 
 Representa o cadastro reutilizável do comprador ou destinatário da entrega.
@@ -380,16 +364,6 @@ O produto atualmente cobre os seguintes módulos e fluxos:
 - resolução parcial ou total;
 - devoluções;
 - histórico e movimentações relacionadas.
-
-### Importação e OCR
-
-- importação de foto;
-- importação de múltiplas fotos ordenadas;
-- importação de PDF com múltiplas páginas;
-- extração de dados por OCR;
-- conferência e edição antes da confirmação;
-- criação ou reaproveitamento de cliente durante o fluxo de importação;
-- criação da entrega a partir dos dados confirmados.
 
 ### Dashboard
 

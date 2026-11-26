@@ -10,11 +10,7 @@ autenticação;
 
 cadastro manual de entregas;
 
-importação por imagem ou PDF;
-
-OCR e conferência;
-
-formação de carradas;
+formação de carradas;   
 
 definição de rota;
 
@@ -56,13 +52,7 @@ flowchart TD
 
     L -->|Sim| M[Gestão de usuários]
 
-    G --> N{Origem da entrega}
-    N -->|Manual| O[Cadastrar entrega]
-    N -->|Documento| P[Importar imagem ou PDF]
-
-    P --> Q[OCR / Extração]
-    Q --> R[Conferência e edição]
-    R --> O
+    G --> O[Cadastrar entrega]
 
     O --> S[Entrega disponível para planejamento]
 
@@ -156,19 +146,6 @@ o usuário deixa de ter acesso às rotas protegidas;
 
 uma nova autenticação passa a ser necessária.
 
-4. Entrada de uma entrega no sistema
-
-Uma entrega pode entrar no sistema por dois fluxos principais:
-
-flowchart LR
-    A[Nova entrega] --> B{Origem}
-    B -->|Digitação manual| C[Formulário de entrega]
-    B -->|Documento| D[Importação]
-    D --> E[OCR]
-    E --> F[Conferência]
-    F --> C
-    C --> G[Entrega criada]
-
 5. Cadastro manual da entrega
 
 Uma entrega representa um pedido que precisa ser atendido logisticamente.
@@ -220,77 +197,6 @@ região;
 reservas existentes;
 
 pendências existentes.
-
-6. Importação por documento
-
-6.1 Formatos de entrada
-
-O fluxo atual aceita:
-
-uma imagem;
-
-várias imagens ordenadas;
-
-PDF com múltiplas páginas.
-
-O limite operacional atual é de até:
-
-12 imagens; ou
-
-12 páginas.
-
-6.2 Processamento
-
-O fluxo conceitual é:
-
-flowchart TD
-    A[Selecionar arquivo(s)] --> B[Enviar para processamento]
-    B --> C[Extrair texto]
-    C --> D[Interpretar dados]
-    D --> E[Montar prévia]
-    E --> F[Usuário confere]
-    F --> G{Dados corretos?}
-    G -->|Não| H[Editar campos]
-    H --> F
-    G -->|Sim| I[Confirmar importação]
-    I --> J[Criar ou reutilizar cliente]
-    J --> K[Criar entrega e itens]
-
-6.3 Conferência obrigatória
-
-O OCR não cria sozinho uma entrega definitiva.
-
-Antes da confirmação, o operador deve poder conferir e corrigir:
-
-cliente;
-
-número do pedido;
-
-endereço;
-
-região;
-
-produtos;
-
-códigos;
-
-unidades;
-
-quantidades;
-
-demais campos extraídos.
-
-6.4 Múltiplas páginas
-
-Quando o documento possuir mais de uma imagem ou página:
-
-a ordem deve ser preservada;
-
-o processamento deve considerar o documento como um conjunto;
-
-possíveis sobreposições entre páginas devem ser sinalizadas para conferência.
-
-Isso reduz o risco de um mesmo item ser criado duas vezes.
 
 7. Listagem e prioridade operacional das entregas
 
@@ -970,21 +876,6 @@ flowchart TD
     I -->|DEVOLVIDO| K[Registrar devolução]
     K --> H
 
-33. Fluxo resumido da importação
-
-flowchart TD
-    A[Foto / Fotos / PDF] --> B[Processar documento]
-    B --> C[OCR]
-    C --> D[Extrair campos]
-    D --> E[Prévia editável]
-    E --> F{Conferência aprovada?}
-    F -->|Não| G[Corrigir dados]
-    G --> E
-    F -->|Sim| H[Criar / reutilizar cliente]
-    H --> I[Criar entrega]
-    I --> J[Criar itens]
-    J --> K[Entrega disponível para planejamento]
-
 34. Princípio central do sistema
 
 Uma mesma unidade física de produto não pode estar simultaneamente em classificações logísticas conflitantes.
@@ -1059,7 +950,7 @@ tratamento completo de ocorrências operacionais;
 
 análises gerenciais mais avançadas.
 
-OCR, Dashboard e relatórios básicos não devem mais ser tratados como funcionalidades futuras, pois já fazem parte do sistema atual.
+Dashboard e relatórios básicos não devem mais ser tratados como funcionalidades futuras, pois já fazem parte do sistema atual.
 
 37. Manutenção deste documento
 

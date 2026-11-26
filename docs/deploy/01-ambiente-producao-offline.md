@@ -35,7 +35,6 @@ Navegador (PC da loja / Wi-Fi)
 │  Container: entregas_app_prod (PHP 8.3-FPM + Laravel 12) │
 │                                                          │
 │  ├── Regras de negócio, API e Sanctum                    │
-│  ├── OCR local: Tesseract (por) + Poppler + ImageMagick  │
 │  └── Storage persistido em ./dados_producao/storage      │
 └──────────────────────────────────┬───────────────────────┘
                                    │ rede interna: entregas_net
@@ -57,12 +56,12 @@ sistema-entregas/
 ├── docker-compose.prod.yml           # Orquestração dos 3 serviços de produção
 ├── dados_producao/                   # Volumes físicos persistentes (ignorado no Git)
 │   ├── postgres/                     # Dados reais do PostgreSQL 17
-│   └── storage/                      # Imagens e PDFs enviados no módulo de OCR
+│   └── storage/                      # Arquivos e logs persistentes da aplicação
 ├── backend/
 │   └── .env.production               # Variáveis exclusivas do ambiente empacotado
 └── infra/
     ├── docker/
-    │   ├── backend.Dockerfile        # Imagem PHP 8.3-FPM + extensões Postgres + suíte OCR
+    │   ├── backend.Dockerfile        # Imagem PHP 8.3-FPM + extensões Postgres
     │   ├── frontend.Dockerfile       # Multi-stage build (Node 22 compila Vue -> Nginx serve dist/)
     │   └── entrypoint.sh             # Script de inicialização do container backend
     └── nginx/
@@ -77,24 +76,13 @@ sistema-entregas/
 
     Proxy FastCGI: Requisições que começam com /api, /sanctum, /login, /logout ou /register são encaminhadas diretamente para app:9000 (/var/www/html/public/index.php).
 
-    Limite de upload: Configurado com client_max_body_size 50M para suportar lotes de até 12 imagens ou PDFs de 40 MB no módulo de importação/OCR.
+    - **Limite de upload:** Configurado com `client_max_body_size 10M` para requisições padrão da API.
 
-4.2 Backend e OCR (infra/docker/backend.Dockerfile)
+### 4.2 Backend (`infra/docker/backend.Dockerfile`)
 
-    Baseado em php:8.3-fpm-bookworm com drivers pdo_pgsql, pgsql, gd, zip, mbstring, bcmath, xml e pcntl.
-
-    Instala nativamente no container os binários exigidos pelo OcrTesseractService:
-
-        tesseract-ocr e tesseract-ocr-por (reconhecimento em português);
-
-        poppler-utils (conversão de páginas PDF);
-
-        imagemagick (com política ajustada para leitura/escrita de PDFs).
-
-    Instala dependências PHP com composer install --no-dev --optimize-autoloader, removendo pacotes exclusivos de desenvolvimento (como laravel/boost e fakerphp/faker).
-
-    Ajusta limites do PHP (upload_max_filesize = 50M, post_max_size = 55M, memory_limit = 512M, max_execution_time = 120).
-
+- Baseado em `php:8.3-fpm-bookworm` com extensões `pdo_pgsql`, `pgsql`, `gd`, `zip`, `mbstring`, `bcmath`, `xml` e `pcntl`.
+- Instala dependências PHP com `composer install --no-dev --optimize-autoloader`, removendo pacotes exclusivos de desenvolvimento (como `laravel/boost` e `fakerphp/faker`).
+- Ajusta limites do PHP (`upload_max_filesize = 10M`, `post_max_size = 12M`, `memory_limit = 256M`, `max_execution_time = 60`).
 4.3 Inicialização Automática (infra/docker/entrypoint.sh)
 
 Executado automaticamente toda vez que o container entregas_app_prod sobe:
@@ -125,7 +113,7 @@ Para que o sistema funcione em qualquer computador da loja (acessado via http://
 
 6. Persistência, Tolerância a Falhas e Integração Futura
 
-    Persistência física: Os dados do banco e os arquivos enviados no OCR são gravados fora dos containers, na pasta ./dados_producao/, garantindo que atualizações de imagem Docker não apaguem o histórico da loja.
+    Persistência física:** Os dados do banco e o storage da aplicação são gravados fora dos containers, na pasta `./dados_producao/`, garantindo que atualizações de imagem Docker não apaguem o histórico da loja.
 
     Recuperação automática: Os três serviços possuem restart: always, subindo automaticamente após reinicialização do computador ou queda de energia.
 

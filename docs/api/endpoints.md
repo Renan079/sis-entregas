@@ -40,8 +40,6 @@ históricos;
 
 Dashboard;
 
-importação/OCR;
-
 relatórios.
 
 2. Endereços do ambiente local
@@ -1558,205 +1556,6 @@ regiao
 data_abertura
 dias_aberta
 
-42. Importação/OCR — gerar prévia
-
-POST /api/documentos/importar-preview
-
-Recebe foto(s) ou PDF e retorna uma prévia editável.
-
-Content-Type
-
-multipart/form-data
-
-Campo atual
-
-arquivos[]
-
-O campo legado:
-
-arquivo
-
-continua aceito por compatibilidade.
-
-42.1 Arquivos aceitos
-
-Extensões:
-
-jpg
-jpeg
-png
-webp
-pdf
-
-Cada arquivo:
-
-máximo 12 MB
-
-Conjunto:
-
-máximo 40 MB
-
-Quantidade:
-
-1 até 12 arquivos
-
-Não é permitido misturar:
-
-PDF + imagens
-
-na mesma importação.
-
-O fluxo de PDF suporta atualmente até 12 páginas.
-
-42.2 Múltiplas fotos
-
-As imagens são tratadas na ordem enviada:
-
-topo
-↓
-meio
-↓
-final
-
-Todas representam um único documento e uma única entrega.
-
-42.3 Resposta
-
-201 Created
-
-Exemplo conceitual:
-
-{
-  "data": {
-    "documento": {
-      "id": 25,
-      "nome_arquivo": "nota.pdf",
-      "tipo_arquivo": "PDF",
-      "quantidade_arquivos": 1,
-      "status": "AGUARDANDO_CONFIRMACAO"
-    },
-    "dados": {
-      "numero_pedido": "89567",
-      "data_documento": null,
-      "cliente": {
-        "codigo_externo": null,
-        "nome": "João",
-        "apelido": null,
-        "telefone": null
-      },
-      "endereco": "Rua A",
-      "referencia": null,
-      "prioridade": "NORMAL",
-      "observacao": null,
-      "itens": [],
-      "avisos": []
-    },
-    "sugestoes": {
-      "cliente": null,
-      "regiao": null,
-      "pedido_ja_existe": false
-    }
-  }
-}
-
-42.4 Avisos de sobreposição
-
-Quando várias fotos possuem conteúdo repetido, o sistema pode adicionar aviso em:
-
-dados.avisos
-
-A aplicação não remove automaticamente itens idênticos, pois linhas iguais podem ser legítimas.
-
-43. Importação/OCR — confirmar
-
-POST /api/documentos/{documentoId}/confirmar
-
-Confirma a prévia revisada e cria a entrega definitiva.
-
-Payload
-
-{
-  "numero_pedido": "89567",
-  "cliente_id": null,
-  "cliente": {
-    "codigo_externo": null,
-    "nome": "João",
-    "apelido": null,
-    "telefone": null
-  },
-  "regiao_id": 2,
-  "endereco": "Rua A",
-  "referencia": null,
-  "prioridade": "NORMAL",
-  "observacao": null,
-  "itens": [
-    {
-      "codigo_produto": "148",
-      "descricao_produto": "Argamassa AC3",
-      "unidade": "UN",
-      "quantidade_solicitada": 50,
-      "observacao": null
-    }
-  ]
-}
-
-Regras principais
-
-numero_pedido:
-
-obrigatório
-máximo 80
-
-cliente_id:
-
-opcional
-exists:clientes,id
-
-cliente.nome:
-
-obrigatório
-máximo 180
-
-regiao_id:
-
-obrigatório
-exists:regiaos,id
-
-endereco:
-
-obrigatório
-máximo 500
-
-prioridade:
-
-BAIXA
-NORMAL
-ALTA
-URGENTE
-
-itens:
-
-obrigatório
-mínimo 1
-
-quantidade_solicitada:
-
-numeric
-> 0
-
-Resposta
-
-201 Created
-
-Exemplo:
-
-{
-  "data": {
-    "entrega_id": 100,
-    "numero_pedido": "89567",
-    "status": "PENDENTE"
-  }
-}
 
 44. Relatórios
 
@@ -2191,19 +1990,9 @@ GET
 
 /api/dashboard
 
-Importação / OCR
-
 Método
 
 Endpoint
-
-POST
-
-/api/documentos/importar-preview
-
-POST
-
-/api/documentos/{documentoId}/confirmar
 
 Relatórios
 
@@ -2255,22 +2044,6 @@ sequenceDiagram
     F->>A: POST /api/saidas/{id}/finalizar
     A-->>F: Carrada FINALIZADA
 
-49. Fluxo de importação pela API
-
-sequenceDiagram
-    participant F as Frontend
-    participant A as API
-    participant O as OCR
-
-    F->>A: POST /api/documentos/importar-preview
-    A->>O: processar documento
-    O-->>A: texto/dados extraídos
-    A-->>F: prévia editável
-
-    F->>F: usuário confere/corrige
-
-    F->>A: POST /api/documentos/{id}/confirmar
-    A-->>F: entrega criada
 
 50. Fluxo administrativo de usuários
 

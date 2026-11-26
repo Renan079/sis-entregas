@@ -18,8 +18,6 @@ localização das regras de negócio;
 
 autenticação e autorização;
 
-processamento de documentos e OCR;
-
 padrões de histórico e rastreabilidade;
 
 convenções que devem ser preservadas durante a evolução do projeto.
@@ -90,27 +88,6 @@ em desenvolvimento: frontend e backend executados separadamente
 
 em produção offline: containers fechados empacotados com servidor web único
 
-2.4 Ferramentas auxiliares de importação
-
-O módulo de importação utiliza processamento local para leitura de documentos.
-
-Componentes utilizados no fluxo atual incluem:
-
-Tesseract OCR;
-
-Poppler;
-
-ImageMagick.
-
-Esses componentes auxiliam na transformação de:
-
-imagem / PDF
-    ↓
-texto
-    ↓
-dados estruturados
-    ↓
-prévia editável
 
 3. Ambientes de execução
 
@@ -137,8 +114,8 @@ nginx (porta 80)
  ├── /                                       → arquivos estáticos compilados do Vue (dist/)
  └── /api, /login, /logout, /register, /sanctum → proxy FastCGI interno para app:9000
 
-app (PHP 8.3-FPM + Laravel + Tesseract/Poppler/ImageMagick)
- └── conecta internamente em db:5432
+app (PHP 8.3-FPM + Laravel)
+ └── conecta internamente em db:5432 e ao banco externo da loja (futura integração)
 
 db (PostgreSQL 17)
  └── dados persistidos em volume local (dados_producao/postgres)
@@ -168,9 +145,6 @@ flowchart LR
     BS --> EV[Eventos / Históricos]
     M --> DB[(PostgreSQL)]
     EV --> DB
-
-    API --> OCR[Serviços de importação / OCR]
-    OCR --> DB
 
 Fluxo conceitual principal:
 
@@ -355,7 +329,6 @@ Componentes:
 
 src/components/Entregas/
 ├── EntregaHistoricoPainel.vue
-└── ImportarEntregaModal.vue
 
 8.4 Clientes
 
@@ -715,7 +688,6 @@ ClienteController
 RegiaoController
 VeiculoController
 PendenciaController
-DocumentoImportacaoController
 EntregaHistoricoController
 SaidaHistoricoController
 
@@ -749,7 +721,6 @@ StoreSaidaRequest
 AdicionarEntregaSaidaRequest
 RegistrarResultadoEntregaRequest
 RegistrarResultadoPendenciaRequest
-ImportarDocumentoPreviewRequest
 
 O objetivo é permitir que Services recebam dados previamente validados.
 
@@ -796,7 +767,6 @@ backend/app/Services/
 ├── EntregaStatusService.php
 ├── PendenciaService.php
 ├── SaidaHistoricoService.php
-└── DocumentoImportacaoService.php
 
 Outros services podem ser adicionados conforme novos módulos exigirem isolamento de responsabilidade.
 
@@ -937,72 +907,6 @@ eventos.
 
 Carrada com somente reentrega continua sendo uma operação real e deve aparecer corretamente.
 
-29. DocumentoImportacaoService
-
-Responsável pela etapa técnica de importação de documentos.
-
-Fluxo conceitual:
-
-arquivo
- ↓
-armazenamento
- ↓
-extração de texto
- ↓
-interpretação
- ↓
-prévia
- ↓
-confirmação pelo usuário
- ↓
-entrega
-
-Responsabilidades podem incluir:
-
-receber imagem ou PDF;
-
-armazenar arquivo;
-
-calcular hash;
-
-extrair texto;
-
-processar várias páginas;
-
-gerar dados preliminares;
-
-identificar possíveis duplicidades/sobreposições;
-
-preparar dados para conferência.
-
-O Service de importação não deve considerar o OCR infalível.
-
-30. Pipeline OCR
-
-Visão técnica:
-
-flowchart TD
-    A[Upload] --> B{Tipo}
-    B -->|Imagem| C[Normalização]
-    B -->|PDF| D[Conversão de páginas]
-
-    D --> C
-    C --> E[Tesseract OCR]
-    E --> F[Texto extraído]
-    F --> G[Parser]
-    G --> H[Dados estruturados]
-    H --> I[Prévia editável]
-    I --> J[Confirmação]
-    J --> K[Persistência]
-
-Para múltiplas imagens:
-
-imagem 1
-imagem 2
-imagem 3
-...
-
-a ordem informada deve ser preservada.
 
 31. Models
 
@@ -1014,7 +918,6 @@ User
 Cliente
 Regiao
 Veiculo
-DocumentoImportado
 
 Entrega
 EntregaItem
@@ -1079,8 +982,6 @@ snapshots;
 movimentações;
 
 eventos;
-
-documentos importados;
 
 autenticação/sessões quando configurado.
 
@@ -1318,32 +1219,6 @@ sequenceDiagram
     C-->>FS: JSON
     FS-->>V: dados atualizados
 
-41. Fluxo técnico de importação
-
-sequenceDiagram
-    participant U as Usuário
-    participant V as ImportarEntregaModal
-    participant DS as Service HTTP
-    participant C as DocumentoImportacaoController
-    participant IS as DocumentoImportacaoService
-    participant OCR as OCR local
-    participant DB as PostgreSQL
-
-    U->>V: seleciona foto(s) ou PDF
-    V->>DS: envia arquivo(s)
-    DS->>C: request de preview
-    C->>IS: gerarPreview()
-    IS->>DB: registra documento
-    IS->>OCR: extrair texto
-    OCR-->>IS: texto extraído
-    IS->>IS: parser / estruturação
-    IS-->>C: prévia
-    C-->>DS: JSON
-    DS-->>V: campos editáveis
-    U->>V: confere/corrige
-    V->>DS: confirma importação
-    DS->>C: confirmação
-    C->>DB: cria/reutiliza cliente e entrega
 
 42. Dashboard
 
@@ -1486,8 +1361,6 @@ REENTREGA não volta para saldo normal
 usuário inativo não opera
 
 ação ADMIN exige autorização
-
-dados OCR exigem confirmação
 
 O frontend melhora a experiência.
 
@@ -1750,7 +1623,7 @@ integrações externas;
 
 relatórios gerenciais mais avançados.
 
-OCR, Dashboard e relatórios básicos deixam de ser classificados como arquitetura futura porque já fazem parte da aplicação.
+Dashboard e relatórios básicos deixam de ser classificados como arquitetura futura porque já fazem parte da aplicação. A integração direta com o banco de dados do sistema comercial da loja permanece como evolução planejada.
 
 56. Fluxo padrão para novos módulos
 

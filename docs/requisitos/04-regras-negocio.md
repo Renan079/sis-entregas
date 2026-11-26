@@ -572,62 +572,6 @@ RN-057 — Senha nunca deve ser armazenada em texto puro
 
 Senhas devem ser persistidas utilizando mecanismo de hash seguro fornecido pelo framework.
 
-10. Regras de importação e OCR
-
-RN-058 — OCR é auxílio, não fonte definitiva
-
-Resultado de OCR pode conter erro.
-
-Nenhuma extração deve ser considerada automaticamente correta apenas por ter sido reconhecida pelo sistema.
-
-RN-059 — Importação precisa de conferência humana
-
-Antes de criar a entrega definitiva, o usuário deve poder revisar e corrigir os dados extraídos.
-
-RN-060 — Documento pode ser imagem ou PDF
-
-O fluxo de importação pode receber:
-
-imagem única;
-
-múltiplas imagens ordenadas;
-
-PDF com múltiplas páginas.
-
-O limite operacional atualmente adotado é de até 12 imagens ou 12 páginas por importação.
-
-RN-061 — Ordem das páginas precisa ser preservada
-
-Quando várias imagens representam o mesmo documento, a ordem definida no envio deve ser preservada durante o processamento.
-
-RN-062 — Sobreposição entre páginas deve gerar atenção
-
-Quando houver indício de conteúdo repetido entre páginas ou imagens consecutivas, o sistema deve alertar para conferência.
-
-O objetivo é reduzir risco de duplicação de produtos.
-
-RN-063 — Documento importado deve permanecer rastreável
-
-Sempre que possível, o sistema deve manter vínculo entre:
-
-arquivo importado;
-
-processamento realizado;
-
-dados extraídos;
-
-entrega criada.
-
-RN-064 — Cliente pode ser reutilizado ou criado na confirmação
-
-Durante a confirmação da importação, o sistema pode:
-
-utilizar um cliente existente; ou
-
-criar o cadastro necessário.
-
-A decisão deve ocorrer antes da criação definitiva da entrega.
-
 11. Regras de Dashboard e priorização visual
 
 RN-065 — Dashboard não substitui os dados operacionais
