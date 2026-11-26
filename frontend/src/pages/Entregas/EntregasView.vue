@@ -5,8 +5,6 @@ import { useRouter } from 'vue-router'
 import { entregaService } from '@/services/entregaService'
 import { regiaoService } from '@/services/regiaoService'
 
-import ImportarEntregaModal from '@/components/Entregas/ImportarEntregaModal.vue'
-
 import type { Regiao } from '@/types/Regiao'
 import type {
   Entrega,
@@ -21,8 +19,6 @@ const regioes = ref<Regiao[]>([])
 
 const carregando = ref(false)
 const erro = ref('')
-
-const modalImportacao = ref(false)
 
 const paginaAtual = ref(1)
 const ultimaPagina = ref(1)
@@ -71,19 +67,6 @@ async function carregarRegioes() {
   } catch {
     erro.value = 'Não foi possível carregar as regiões.'
   }
-}
-
-function abrirImportacao() {
-  modalImportacao.value = true
-}
-
-function fecharImportacao() {
-  modalImportacao.value = false
-}
-
-async function importacaoConcluida() {
-  modalImportacao.value = false
-  await carregarEntregas(1)
 }
 
 async function novaEntrega() {
@@ -257,14 +240,6 @@ onMounted(async () => {
       </div>
 
       <div class="cabecalho-acoes">
-        <button
-          class="botao secundario"
-          type="button"
-          @click="abrirImportacao"
-        >
-          Importar foto
-        </button>
-
         <button
           class="botao primario"
           type="button"
@@ -527,13 +502,6 @@ onMounted(async () => {
         </button>
       </footer>
     </section>
-
-    <ImportarEntregaModal
-      :aberto="modalImportacao"
-      :regioes="regioes"
-      @fechar="fecharImportacao"
-      @importado="importacaoConcluida"
-    />
   </main>
 </template>
 

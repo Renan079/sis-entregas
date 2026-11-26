@@ -3,22 +3,16 @@ FROM php:8.3-fpm-bookworm
 # Instala dependências do sistema, extensões PHP e ferramentas de OCR (Tesseract, Poppler, ImageMagick)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    curl \
     unzip \
     libpq-dev \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
     libzip-dev \
-    libonig-dev \
     libxml2-dev \
-    tesseract-ocr \
-    tesseract-ocr-por \
-    poppler-utils \
-    imagemagick \
+    libonig-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        pdo \
         pdo_pgsql \
         pgsql \
         gd \

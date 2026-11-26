@@ -3,7 +3,6 @@
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\ClienteHistoricoController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DocumentoImportacaoController;
 use App\Http\Controllers\EntregaController;
 use App\Http\Controllers\EntregaHistoricoController;
 use App\Http\Controllers\PendenciaController;
@@ -178,16 +177,6 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::get(
         '/dashboard',
         DashboardController::class
-    );
-
-    Route::post(
-        '/documentos/importar-preview',
-        [DocumentoImportacaoController::class, 'preview']
-    );
-
-    Route::post(
-        '/documentos/{documentoId}/confirmar',
-        [DocumentoImportacaoController::class, 'confirmar']
     );
 
     Route::get(
