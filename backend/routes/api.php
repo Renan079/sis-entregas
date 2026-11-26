@@ -15,6 +15,8 @@ use App\Http\Controllers\VeiculoController;
 use App\Http\Middleware\EnsureUserIsActive;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\IntegracaoPedidoController;
+use App\Http\Controllers\Api\IntegracaoClienteController;
 
 Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function () {
 
@@ -182,5 +184,15 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::get(
         '/relatorios',
         [RelatorioController::class, 'index']
+    );
+
+    Route::get(
+        '/integracao/pedidos/{numero}',
+         [IntegracaoPedidoController::class, 'show']
+    );
+
+    Route::post(
+        '/integracao/clientes',
+        [IntegracaoClienteController::class, 'store']
     );
 });

@@ -112,6 +112,16 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        'firebird' => [
+            'driver' => 'pdo_firebird',
+            'host' => env('FIREBIRD_HOST', 'host.docker.internal'),
+            'port' => env('FIREBIRD_PORT', '3055'),
+            'database' => env('FIREBIRD_DATABASE', '/firebird/data/loja.fdb'),
+            'username' => env('FIREBIRD_USERNAME', 'SYSDBA'),
+            'password' => env('FIREBIRD_PASSWORD', 'masterkey'),
+            'charset' => env('FIREBIRD_CHARSET', 'WIN1252'),
+        ],
+
     ],
 
     /*

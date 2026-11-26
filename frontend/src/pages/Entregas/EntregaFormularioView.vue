@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { clienteService } from '@/services/clienteService'
 import { entregaService } from '@/services/entregaService'
+import { buscarPedidoExterno, cadastrarClienteExterno } from '@/services/integracaoService'
 import { regiaoService } from '@/services/regiaoService'
 
 import type { Cliente } from '@/types/Cliente'
@@ -14,6 +15,13 @@ import type {
   EntregaItemForm,
 } from '@/types/Entrega'
 
+interface ClienteExternoPendente {
+  codigo_externo: string | null
+  nome: string
+  apelido: string | null
+  telefone: string | null
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -22,9 +30,15 @@ const clientes = ref<Cliente[]>([])
 
 const carregando = ref(false)
 const salvando = ref(false)
+const buscandoPedido = ref(false)
 const erro = ref('')
+const avisoIntegracao = ref('')
 const buscaCliente = ref('')
 const entregaCarregada = ref<Entrega | null>(null)
+
+const modalCadastroClienteAberto = ref(false)
+const salvandoClienteExterno = ref(false)
+const clienteExternoPendente = ref<ClienteExternoPendente | null>(null)
 
 const entregaId = computed(() => {
   const valor = Number(route.params.id)
@@ -107,6 +121,7 @@ function preencherFormulario(entrega: Entrega) {
 async function carregarPagina() {
   carregando.value = true
   erro.value = ''
+  avisoIntegracao.value = ''
 
   try {
     await carregarRegioes()
@@ -162,6 +177,123 @@ function limparClienteSelecionado() {
   formulario.cliente_telefone = ''
   buscaCliente.value = ''
   clientes.value = []
+}
+
+function fecharModalCadastroCliente() {
+  modalCadastroClienteAberto.value = false
+  clienteExternoPendente.value = null
+}
+
+async function confirmarCadastroClienteExterno() {
+  if (!clienteExternoPendente.value) {
+    return
+  }
+
+  salvandoClienteExterno.value = true
+  erro.value = ''
+
+  try {
+    const resposta = await cadastrarClienteExterno({
+      codigo_externo: clienteExternoPendente.value.codigo_externo,
+      nome: clienteExternoPendente.value.nome,
+      apelido: clienteExternoPendente.value.apelido,
+      telefone: clienteExternoPendente.value.telefone,
+    })
+
+    formulario.cliente_id = resposta.cliente.id
+    formulario.cliente_nome = resposta.cliente.nome
+    formulario.cliente_apelido = resposta.cliente.apelido ?? ''
+    buscaCliente.value = resposta.cliente.nome
+
+    if (resposta.cliente.telefone) {
+      formulario.cliente_telefone = resposta.cliente.telefone
+    }
+
+    fecharModalCadastroCliente()
+    avisoIntegracao.value = `Cliente "${resposta.cliente.nome}" cadastrado e vinculado à entrega.`
+  } catch (e: unknown) {
+    const mensagem = (
+      e as { response?: { data?: { message?: string } } }
+    )?.response?.data?.message
+
+    erro.value =
+      mensagem || 'Não foi possível cadastrar o cliente.'
+  } finally {
+    salvandoClienteExterno.value = false
+  }
+}
+
+async function buscarPedidoNoSistema() {
+  if (editando.value || bloqueada.value) {
+    return
+  }
+
+  const numero = formulario.numero_pedido?.trim()
+
+  if (!numero) {
+    erro.value = 'Informe o número do pedido para buscar no sistema.'
+    return
+  }
+
+  buscandoPedido.value = true
+  erro.value = ''
+  avisoIntegracao.value = ''
+  clientes.value = []
+  fecharModalCadastroCliente()
+
+  try {
+    const pedido = await buscarPedidoExterno(numero)
+
+    formulario.numero_pedido = pedido.numero_pedido
+    formulario.cliente_id = pedido.cliente_id
+    formulario.cliente_nome = pedido.cliente.nome
+    formulario.cliente_apelido = pedido.cliente.apelido ?? ''
+    formulario.cliente_telefone = pedido.cliente.telefone ?? ''
+    buscaCliente.value = pedido.cliente.nome
+
+    if (pedido.regiao_id) {
+      formulario.regiao_id = pedido.regiao_id
+    }
+
+    formulario.endereco = pedido.endereco
+    formulario.referencia = pedido.referencia ?? ''
+    formulario.observacao = pedido.observacao ?? ''
+
+    if (pedido.itens.length > 0) {
+      formulario.itens = pedido.itens.map((item) => ({
+        codigo_produto: item.codigo_produto ?? '',
+        descricao_produto: item.descricao_produto,
+        unidade: item.unidade || 'UN',
+        quantidade_solicitada: Number(item.quantidade_solicitada),
+        observacao: item.observacao ?? '',
+      }))
+    } else {
+      formulario.itens = [novoItem()]
+    }
+
+    if (pedido.alertas.pedido_ja_existe) {
+      avisoIntegracao.value = `Atenção: já existe uma entrega ativa cadastrada para o pedido #${pedido.numero_pedido}.`
+    } else if (!pedido.alertas.regiao_encontrada) {
+      avisoIntegracao.value =
+        'Pedido carregado do sistema comercial. Selecione uma região antes de salvar.'
+    } else {
+      avisoIntegracao.value = `Pedido #${pedido.numero_pedido} carregado do sistema comercial.`
+    }
+
+    if (!pedido.alertas.cliente_cadastrado && pedido.cliente?.nome) {
+      clienteExternoPendente.value = pedido.cliente
+      modalCadastroClienteAberto.value = true
+    }
+  } catch (e: unknown) {
+    const mensagem = (
+      e as { response?: { data?: { message?: string } } }
+    )?.response?.data?.message
+
+    erro.value =
+      mensagem || 'Não foi possível buscar o pedido no sistema comercial.'
+  } finally {
+    buscandoPedido.value = false
+  }
 }
 
 function adicionarItem() {
@@ -314,6 +446,13 @@ onMounted(carregarPagina)
         {{ erro }}
       </p>
 
+      <p
+        v-if="avisoIntegracao"
+        class="estado-formulario"
+      >
+        {{ avisoIntegracao }}
+      </p>
+
       <section class="card-formulario">
         <form @submit.prevent="salvarEntrega">
           <fieldset :disabled="bloqueada || salvando">
@@ -321,11 +460,23 @@ onMounted(carregarPagina)
               <div class="campo">
                 <label>Número do pedido</label>
 
-                <input
-                  v-model="formulario.numero_pedido"
-                  type="text"
-                  placeholder="Ex: 23249"
-                />
+                <div class="cliente-busca">
+                  <input
+                    v-model="formulario.numero_pedido"
+                    type="text"
+                    placeholder="Ex: 9945"
+                  />
+
+                  <button
+                    v-if="!editando"
+                    class="botao secundario"
+                    type="button"
+                    :disabled="buscandoPedido || bloqueada || salvando"
+                    @click="buscarPedidoNoSistema"
+                  >
+                    {{ buscandoPedido ? 'Buscando...' : 'Buscar' }}
+                  </button>
+                </div>
               </div>
 
               <div class="campo">
@@ -545,7 +696,95 @@ onMounted(carregarPagina)
         </form>
       </section>
     </template>
+
+    <div
+      v-if="modalCadastroClienteAberto && clienteExternoPendente"
+      class="modal-backdrop"
+    >
+      <div class="modal-card">
+        <h3>Cliente não cadastrado</h3>
+        <p>
+          Este cliente ainda não possui cadastro no sistema. Deseja cadastrá-lo com os dados da loja?
+        </p>
+
+        <div class="modal-dados">
+          <div>
+            <strong>Código externo:</strong>
+            {{ clienteExternoPendente.codigo_externo || '—' }}
+          </div>
+          <div>
+            <strong>Nome:</strong>
+            {{ clienteExternoPendente.nome }}
+          </div>
+          <div v-if="clienteExternoPendente.apelido">
+            <strong>Apelido:</strong>
+            {{ clienteExternoPendente.apelido }}
+          </div>
+          <div>
+            <strong>Telefone:</strong>
+            {{ clienteExternoPendente.telefone || '—' }}
+          </div>
+        </div>
+
+        <footer class="modal-acoes">
+          <button
+            class="botao secundario"
+            type="button"
+            :disabled="salvandoClienteExterno"
+            @click="fecharModalCadastroCliente"
+          >
+            Não, apenas usar aqui
+          </button>
+
+          <button
+            class="botao primario"
+            type="button"
+            :disabled="salvandoClienteExterno"
+            @click="confirmarCadastroClienteExterno"
+          >
+            {{ salvandoClienteExterno ? 'Cadastrando...' : 'Sim, cadastrar cliente' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </main>
 </template>
 
 <style scoped src="../../styles/pages/entrega/entrega-formulario.css"></style>
+
+<style scoped>
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+.modal-dados {
+  display: grid;
+  gap: 0.4rem;
+  margin: 1rem 0 1.25rem;
+  padding: 0.85rem;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.modal-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+</style>

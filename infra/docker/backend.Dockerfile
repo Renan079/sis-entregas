@@ -11,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libzip-dev \
     libxml2-dev \
     libonig-dev \
+    firebird-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
         pdo_pgsql \
+        pdo_firebird \
         pgsql \
         gd \
         zip \
