@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: entregas_db_prod
+    restart: always
+    environment:
+      POSTGRES_DB: sistema_entregas
+      POSTGRES_USER: entregas_user
+      POSTGRES_PASSWORD: entregas_prod_2026
+      TZ: America/Fortaleza
+    volumes:
+      - ./dados_producao/postgres:/var/lib/postgresql/data
+    networks:
+      - entregas_net
+
+  app:
+    build:
+      context: .
+      dockerfile: infra/docker/backend.Dockerfile
+    image: sistema-entregas-app:1.0
+    container_name: entregas_app_prod
+    restart: always
+    env_file:
+      - ./backend/.env.production
+    volumes:
+      - ./dados_producao/storage:/var/www/html/storage/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - db
+    networks:
+      - entregas_net
+
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+    image: sistema-entregas-nginx:1.0
+    container_name: entregas_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - entregas_net
+
+networks:
+  entregas_net:
+    driver: bridge

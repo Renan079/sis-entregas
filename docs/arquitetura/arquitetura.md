@@ -78,13 +78,17 @@ Vitest
 
 2.3 Infraestrutura
 
-Docker
+Docker e Docker Compose
 
 PostgreSQL 17
 
-ambiente local Linux
+Nginx (proxy reverso e servidor de arquivos estáticos em produção)
 
-frontend e backend executados separadamente durante o desenvolvimento
+ambiente local Linux / Windows
+
+em desenvolvimento: frontend e backend executados separadamente
+
+em produção offline: containers fechados empacotados com servidor web único
 
 2.4 Ferramentas auxiliares de importação
 
@@ -108,18 +112,38 @@ dados estruturados
     ↓
 prévia editável
 
-3. Ambiente local atual
+3. Ambientes de execução
 
-Configuração utilizada no ambiente de desenvolvimento:
+3.1 Ambiente de desenvolvimento
+
+Configuração utilizada durante o desenvolvimento local:
 
 Frontend:   http://127.0.0.1:5173
 Backend:    http://127.0.0.1:8001
 PostgreSQL: 127.0.0.1:5433
 
-O PostgreSQL executa em container Docker.
+O PostgreSQL executa em container Docker na porta externa 5433.
 
-A porta externa utilizada atualmente é 5433.
+3.2 Ambiente de produção offline (empacotado)
 
+Configuração utilizada na máquina servidora da loja (100% sem internet):
+
+Acesso local:      http://localhost (porta 80)
+Acesso rede local: http://<IP-DA-MAQUINA-NA-LOJA> (porta 80)
+
+Arquitetura em containers (docker-compose.prod.yml):
+
+nginx (porta 80)
+ ├── /                                       → arquivos estáticos compilados do Vue (dist/)
+ └── /api, /login, /logout, /register, /sanctum → proxy FastCGI interno para app:9000
+
+app (PHP 8.3-FPM + Laravel + Tesseract/Poppler/ImageMagick)
+ └── conecta internamente em db:5432
+
+db (PostgreSQL 17)
+ └── dados persistidos em volume local (dados_producao/postgres)
+
+Detalhes de geração de pacote, instalação e backup estão documentados em docs/deploy/.
 4. Visão geral da arquitetura
 
 flowchart LR
@@ -476,6 +500,14 @@ Cookie de sessão / XSRF
  ↓
 Laravel
 
+Configuração da baseURL (src/services/api.ts):
+
+baseURL: import.meta.env.VITE_API_URL || ''
+
+Em desenvolvimento, VITE_API_URL aponta para http://127.0.0.1:8001.
+
+Em produção offline, VITE_API_URL fica vazio e as chamadas utilizam caminhos relativos no mesmo host/porta servidos pelo Nginx.
+
 12. Types TypeScript
 
 Os arquivos em src/types representam os contratos consumidos pela interface.
@@ -622,6 +654,10 @@ register
 Com credenciais:
 
 supports_credentials = true
+
+Em produção offline, como frontend e backend respondem no mesmo host e porta através do Nginx, as requisições operam em mesma origem (same-origin).
+
+O arquivo config/cors.php aceita configuração via variável de ambiente CORS_ALLOWED_ORIGINS, e config/sanctum.php utiliza Sanctum::currentRequestHost() para reconhecer dinamicamente o IP local da máquina servidora na rede da loja.
 
 18. Laravel Sanctum
 
