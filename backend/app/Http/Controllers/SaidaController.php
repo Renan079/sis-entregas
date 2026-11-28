@@ -140,6 +140,7 @@ class SaidaController extends Controller
             'saidaEntregas.entrega.tentativas',
             'regiaoPrincipal',
             'veiculo',
+            'saidaEntregas.entrega.cliente',
 
             'saidaEntregas.entrega.itens',
 

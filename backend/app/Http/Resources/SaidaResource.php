@@ -32,7 +32,7 @@ class SaidaResource extends JsonResource
                 $this->observacao,
 
             /*
-             * Rota completa e ordenada da carrada.
+- Rota completa e ordenada da carrada.
              */
             'rota' =>
                 $this->normalizarRota(
@@ -120,6 +120,16 @@ class SaidaResource extends JsonResource
                                                 )
                                             : false;
 
+                                    $cliente =
+                                        $entrega->relationLoaded('cliente')
+                                            ? $entrega->cliente
+                                            : null;
+
+                                    $referenciaEntrega =
+                                        $entrega->referencia
+                                        ?? $cliente?->referencia
+                                        ?? null;
+
                                     return [
                                         'id' =>
                                             $entrega->id,
@@ -135,6 +145,16 @@ class SaidaResource extends JsonResource
                                         'endereco' =>
                                             $entrega
                                                 ->endereco,
+
+                                        'referencia' =>
+                                            $referenciaEntrega,
+
+                                        'ponto_referencia' =>
+                                            $referenciaEntrega,
+
+                                        'observacao' =>
+                                            $entrega
+                                                ->observacao,
 
                                         'status' =>
                                             $this

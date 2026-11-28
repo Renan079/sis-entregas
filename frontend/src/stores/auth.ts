@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api } from '@/services/api'
+import { api, fetchCsrfCookie } from '@/services/api'
 
 interface User {
   id: number
@@ -26,7 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
 
     try {
-      await api.get('/sanctum/csrf-cookie')
+      await fetchCsrfCookie()
 
       await api.post('/login', {
         email: email.trim().toLowerCase(),
@@ -43,7 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
     creatingUser.value = true
 
     try {
-      await api.get('/sanctum/csrf-cookie')
+      await fetchCsrfCookie()
 
       const response = await api.post('/register', {
         ...data,

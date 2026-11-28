@@ -7,6 +7,8 @@ import RetornoEntregaModal from '@/components/Saidas/RetornoEntregaModal.vue'
 import RetornoPendenciaModal from '@/components/Saidas/RetornoPendenciaModal.vue'
 import SelecionarItensModal from '@/components/Saidas/SelecionarItensModal.vue'
 import { useSaidaDetalhe } from '@/composables/saidas/useSaidaDetalhe'
+import { imprimirRomaneioCarrada } from '@/utils/romaneioCarrada'
+
 
 const route = useRoute()
 const router = useRouter()
@@ -58,6 +60,11 @@ const {
 
 const saidaId = computed(() => Number(route.params.id))
 
+function gerarRomaneioPdf() {
+  if (!saidaSelecionada.value) return
+  imprimirRomaneioCarrada(saidaSelecionada.value, pendenciasNaCarrada.value)
+}
+
 async function voltar() {
   await router.push('/saidas')
 }
@@ -85,6 +92,15 @@ watch(
           @click="voltar"
         >
           ← Voltar para carradas
+        </button>
+
+        <button
+          v-if="saidaSelecionada"
+          type="button"
+          style="padding: 8px 12px; margin: 8px 0; background: #1d4ed8; color: #fff; border: none; border-radius: 6px; cursor: pointer;"
+          @click="gerarRomaneioPdf"
+        >
+          Gerar PDF / Romaneio
         </button>
 
         <h1>
